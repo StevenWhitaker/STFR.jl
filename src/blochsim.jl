@@ -146,7 +146,7 @@ function stfrblochsim(
         (Atd * (S * (Atg * (Atu * Btf))) + Atd * (S * Btg))
     (Ate, Bte) = freeprecess(spin, TE)
     M = Ate * M + Bte
-    return sum(M[1:3:end]) + im * sum(M[2:3:end])
+    return complex(sum(M[1:3:end]), sum(M[2:3:end]))
 
 end
 
@@ -236,7 +236,7 @@ function stfrblochsim(
     # Calculate steady-state signal at echo time
     M = Dte[1] * M + Dte[2]
 
-    return sum(M[1:3:end]) + im * sum(M[2:3:end])
+    return complex(sum(M[1:3:end]), sum(M[2:3:end]))
 
 end
 
@@ -283,7 +283,7 @@ function stfrblochsim(
     M = A * M + B
     M = Dte[1] * A + Dte[2]
 
-    return (sum(M[1:3:end]) + im * sum(M[2:3:end])) * exp(im * θ)
+    return complex(sum(M[1:3:end]), sum(M[2:3:end])) * exp(im * θ)
 
 end
 
