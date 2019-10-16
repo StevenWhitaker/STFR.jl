@@ -142,7 +142,7 @@ function stfrblochsim(
     (Atf, Btf) = freeprecess_nomutate(spin, Tfree)
     (Atg, Btg) = freeprecess_nomutate(spin, Tg)
     S = spoil(spin)
-    M = (Matrix(I, size(S)) - Atd * S * Atg * Atu * Atf) \
+    M = (diagm(0 => trues(size(S, 1))) - Atd * S * Atg * Atu * Atf) \
         (Atd * (S * (Atg * (Atu * Btf))) + Atd * (S * Btg))
     (Ate, Bte) = freeprecess_nomutate(spin, TE)
     M = Ate * M + Bte
@@ -231,7 +231,7 @@ function stfrblochsim(
 
     # Calculate steady-state magnetization immediately following excitation
     (A, B) = combine(Dte, Dtr, Dtu, Dtg, Dtd)
-    M = (Matrix(I, size(A)) - A) \ B
+    M = (diagm(0 => trues(size(A, 1))) - A) \ B
 
     # Calculate steady-state signal at echo time
     M = Dte[1] * M + Dte[2]
@@ -301,7 +301,7 @@ freeprecess_nomutate(spin::Spin, t::Real) = freeprecess(spin, t)
 function freeprecess_nomutate(spin::SpinMC, t::Real)
 
     E = exp(t * spin.A)
-    B = (Matrix(I, size(E)) - E) * spin.Meq
+    B = (diagm(0 => trues(size(E, 1))) - E) * spin.Meq
     return (E, B)
 
 end
@@ -315,7 +315,7 @@ function freeprecess_nomutate(spin::SpinMC, t::Real, grad::AbstractArray{<:Real,
     ΔA = diagm(1 => repeat([gradfreq, 0, 0], spin.N), # Left-handed rotation
               -1 => repeat([-gradfreq, 0, 0], spin.N))[1:3spin.N,1:3spin.N]
     E = exp(t * (spin.A + ΔA))
-    B = (Matrix(I, size(E)) - E) * spin.Meq
+    B = (diagm(0 => trues(size(E, 1))) - E) * spin.Meq
     return (E, B)
 
 end
