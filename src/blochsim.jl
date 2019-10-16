@@ -55,7 +55,7 @@ function stfrblochsim(
 
     spin = Spin(M0, T1, T2, Δω / 2π)
     if how == :ideal
-        return stfrblochsim!(spin, Tfree, Tg, κ * α, κ * β, ϕ, TE)
+        return stfrblochsim(spin, Tfree, Tg, κ * α, κ * β, ϕ, TE)
     elseif how == :grad || how == :rfspoil
         return stfrblochsim_avg(spin, Tfree, Tg, κ * α, κ * β, ϕ, TE, how;
                                 kwargs...)
@@ -111,7 +111,7 @@ function stfrblochsim(
 
     spin = SpinMC(M0, frac, T1, T2, Δω / 2π, τ)
     if how == :ideal
-        return stfrblochsim!(spin, Tfree, Tg, κ * α, κ * β, ϕ, TE)
+        return stfrblochsim(spin, Tfree, Tg, κ * α, κ * β, ϕ, TE)
     elseif how == :grad || how == :rfspoil
         return stfrblochsim_avg(spin, Tfree, Tg, κ * α, κ * β, ϕ, TE, how;
                                 kwargs...)
@@ -122,12 +122,12 @@ function stfrblochsim(
 end
 
 """
-    stfrblochsim!(spin, Tfree, Tg, α, β, ϕ, TE)
+    stfrblochsim(spin, Tfree, Tg, α, β, ϕ, TE)
 
 Simulate the steady-state signal acquired from STFR, assuming instantaneous
 excitations and ideal spoiling.
 """
-function stfrblochsim!(
+function stfrblochsim(
     spin::AbstractSpin,
     Tfree::Real,
     Tg::Real,
@@ -142,10 +142,11 @@ function stfrblochsim!(
     (Atf, Btf) = freeprecess(spin, Tfree)
     (Atg, Btg) = freeprecess(spin, Tg)
     S = spoil(spin)
-    spin.M[:] = (I - Atd * S * Atg * Atu * Atf) \
-                (Atd * (S * (Atg * (Atu * Btf))) + Atd * (S * Btg))
-    freeprecess!(spin, TE)
-    return spin.signal
+    M = (I - Atd * S * Atg * Atu * Atf) \
+        (Atd * (S * (Atg * (Atu * Btf))) + Atd * (S * Btg))
+    (Ate, Bte) = freeprecess(spin, TE)
+    M = Ate * M + Bte
+    return sum(M[1:3:end]) + im * sum(M[2:3:end])
 
 end
 
@@ -175,11 +176,11 @@ function stfrblochsim_avg(
 
     # Compute the STFR signal for each spin
     if how == :grad
-        signals = map(spin -> stfrblochsim!(spin, Tfree, Tg, α, β, ϕ, TE,
-                                            [0,0,gradz]), spins)
+        signals = map(spin -> stfrblochsim(spin, Tfree, Tg, α, β, ϕ, TE,
+                                           [0,0,gradz]), spins)
     elseif how == :rfspoil
-        signals = map(spin -> stfrblochsim!(spin, Tfree, Tg, α, β, ϕ, TE,
-                                            [0,0,gradz], Δθinc, nTR), spins)
+        signals = map(spin -> stfrblochsim(spin, Tfree, Tg, α, β, ϕ, TE,
+                                           [0,0,gradz], Δθinc, nTR), spins)
     end
 
     # Find the average signal
@@ -203,14 +204,14 @@ function varyz(spin::SpinMC, z)
 end
 
 """
-    stfrblochsim!(spin, Tfree, Tg, α, β, ϕ, TE, grad[, Δθinc, nTR])
+    stfrblochsim(spin, Tfree, Tg, α, β, ϕ, TE, grad[, Δθinc, nTR])
 
 Simulate the steady-state signal acquired from STFR, assuming instantaneous
 excitations and nonideal spoiling.
 
 The steady-state is a pseudo steady-state if using RF spoiling.
 """
-function stfrblochsim!(
+function stfrblochsim(
     spin::AbstractSpin,
     Tfree::Real,
     Tg::Real,
@@ -230,16 +231,16 @@ function stfrblochsim!(
 
     # Calculate steady-state magnetization immediately following excitation
     (A, B) = combine(Dte, Dtr, Dtu, Dtg, Dtd)
-    spin.M[:] = (I - A) \ B
+    M = (I - A) \ B
 
     # Calculate steady-state signal at echo time
-    applydynamics!(spin, Dte...)
+    M = Dte[1] * M + Dte[2]
 
-    return spin.signal
+    return sum(M[1:3:end]) + im * sum(M[2:3:end])
 
 end
 
-function stfrblochsim!(
+function stfrblochsim(
     spin::AbstractSpin,
     Tfree::Real,
     Tg::Real,
@@ -263,22 +264,26 @@ function stfrblochsim!(
     Δθ = Δθinc
 
     # Simulate nTR TR's
+    M = spin.M
     for rep = 1:nTR
 
-        excitation!(spin, θ, α)
-        applydynamics!(spin, Dtetr...)
-        excitation!(spin, θ, -β)
-        applydynamics!(spin, Dtg...)
+        (A, B) = excitation(spin, θ, α)
+        M = A * M + B
+        M = Dtetr[1] * M + Dtetr[2]
+        (A, B) = excitation(spin, θ, -β)
+        M = A * M + B
+        M = Dtg[1] * M + Dtg[2]
         θ += Δθ
         Δθ += Δθinc
 
     end
 
     # Calculate signal at echo time
-    excitation!(spin, θ, α)
-    applydynamics!(spin, Dte...)
+    (A, B) = excitation(spin, θ, α)
+    M = A * M + B
+    M = Dte[1] * A + Dte[2]
 
-    return spin.signal * exp(im * θ)
+    return (sum(M[1:3:end]) + im * sum(M[2:3:end])) * exp(im * θ)
 
 end
 
