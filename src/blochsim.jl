@@ -139,12 +139,12 @@ function stfrblochsim(
 
     (Atd, _) = excitation(spin, 0, α)
     (Atu, _) = excitation(spin, ϕ, -β)
-    (Atf, Btf) = freeprecess_nomutate(spin, Tfree)
-    (Atg, Btg) = freeprecess_nomutate(spin, Tg)
+    (Atf, Btf) = freeprecess(spin, Tfree)
+    (Atg, Btg) = freeprecess(spin, Tg)
     S = spoil(spin)
-    M = (Diagonal(trues(size(S, 1))) - Atd * S * Atg * Atu * Atf) \
+    M = (Diagonal(ones(Bool, size(S, 1))) - Atd * S * Atg * Atu * Atf) \
         (Atd * (S * (Atg * (Atu * Btf))) + Atd * (S * Btg))
-    (Ate, Bte) = freeprecess_nomutate(spin, TE)
+    (Ate, Bte) = freeprecess(spin, TE)
     M = Ate * M + Bte
     return complex(sum(M[1:3:end]), sum(M[2:3:end]))
 
@@ -224,14 +224,14 @@ function stfrblochsim(
 
     # Precompute spin dynamics
     Dtd = excitation(spin, 0, α)
-    Dte = freeprecess_nomutate(spin, TE)
-    Dtr = freeprecess_nomutate(spin, Tfree - TE)
+    Dte = freeprecess(spin, TE)
+    Dtr = freeprecess(spin, Tfree - TE)
     Dtu = excitation(spin, 0, -β)
-    Dtg = freeprecess_nomutate(spin, Tg, grad)
+    Dtg = freeprecess(spin, Tg, grad)
 
     # Calculate steady-state magnetization immediately following excitation
     (A, B) = combine(Dte, Dtr, Dtu, Dtg, Dtd)
-    M = (Diagonal(trues(size(A, 1))) - A) \ B
+    M = (Diagonal(ones(Bool, size(A, 1))) - A) \ B
 
     # Calculate steady-state signal at echo time
     M = Dte[1] * M + Dte[2]
@@ -254,10 +254,10 @@ function stfrblochsim(
 )
 
     # Precompute spin dynamics
-    Dte = freeprecess_nomutate(spin, TE)
-    Dtr = freeprecess_nomutate(spin, Tfree - TE)
+    Dte = freeprecess(spin, TE)
+    Dtr = freeprecess(spin, Tfree - TE)
     Dtetr = combine(Dte, Dtr)
-    Dtg = freeprecess_nomutate(spin, Tg, grad)
+    Dtg = freeprecess(spin, Tg, grad)
 
     # Initialize RF spoiling parameters
     θ = 0
@@ -291,31 +291,5 @@ end
 @noinline function howerror(how::Symbol)
 
     throw(ArgumentError("unsupported how = :$how"))
-
-end
-
-# Versions of freeprecess that doesn't mutate arrays, hence is differentiable
-# using Zygote
-freeprecess_nomutate(spin::Spin, t::Real) = freeprecess(spin, t)
-
-function freeprecess_nomutate(spin::SpinMC, t::Real)
-
-    E = exp(t * spin.A)
-    B = (Diagonal(trues(size(E, 1))) - E) * spin.Meq
-    return (E, B)
-
-end
-
-freeprecess_nomutate(spin::Spin, t::Real, grad::AbstractArray{<:Real,1}) =
-    freeprecess(spin, t, grad)
-
-function freeprecess_nomutate(spin::SpinMC, t::Real, grad::AbstractArray{<:Real,1})
-
-    gradfreq = GAMMA * sum(grad .* spin.pos) / 1000 # rad/ms
-    ΔA = diagm(1 => repeat([gradfreq, 0, 0], spin.N), # Left-handed rotation
-              -1 => repeat([-gradfreq, 0, 0], spin.N))[1:3spin.N,1:3spin.N]
-    E = exp(t * (spin.A + ΔA))
-    B = (Diagonal(trues(size(E, 1))) - E) * spin.Meq
-    return (E, B)
 
 end
