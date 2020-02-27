@@ -1,5 +1,8 @@
 # STFR.jl
 
+[![Build Status](https://travis-ci.org/StevenWhitaker/STFR.jl.svg?branch=master)](https://tracis-ci.org/StevenWhitaker/STFR.jl)
+[![codecov](https://codecov.io/gh/StevenWhitaker/STFR.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/StevenWhitaker/STFR.jl)
+
 This package provides functionality for simulating the signal acquired from a small-tip fast recovery (STFR) MRI scan. The function `stfr` implements the signal equations found in the following papers:
 
 - [J.-F. Nielsen, D. Yoon, and D. C. Noll. Small-tip fast recovery imaging using non-slice-selective tailored tip-up pulses and radiofrequency-spoiling. Mag. Res. Med., 69(3):657-66, March 2013.](https://onlinelibrary.wiley.com/doi/full/10.1002/mrm.24289)
