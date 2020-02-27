@@ -281,7 +281,7 @@ function stfrblochsim(
     # Calculate signal at echo time
     (A, B) = excitation(spin, θ, α)
     M = A * M + B
-    M = Dte[1] * A + Dte[2]
+    M = Dte[1] * M + Dte[2]
 
     return complex(sum(M[1:3:end]), sum(M[2:3:end])) * exp(im * θ)
 
