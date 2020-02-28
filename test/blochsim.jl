@@ -109,6 +109,42 @@ function testnonideal1()
 
 end
 
+function testnonideal2()
+
+    M0 = [1.04, 0.8, 1.3]
+    frac = permutedims([[1], [1], [1]])
+    T1 = permutedims([[833], [900], [1100]])
+    T2 = permutedims([[76], [90], [100]])
+    Δω = permutedims([[10], [0], [30]] * 2π)
+    τ = permutedims([Int[], Int[], Int[]])
+    κ = [0.9, 1, 1.1]
+    Tfree = [8, 10]
+    Tg = [3, 4]
+    α = deg2rad.([15, 14])
+    β = deg2rad.([13, 3])
+    ϕ = deg2rad.([30, 0])
+    s1 = stfrblochsim.(M0', frac, T1, T2, Δω, τ, κ', Tfree, Tg, α, β, ϕ,
+                       how = :grad)
+    s2 = stfrblochsim.(M0', frac, T1, T2, Δω, τ, κ', Tfree, Tg, α, β, ϕ,
+                       how = :rfspoil, Δθinc = 2π, nTR = 2000)
+    return s1 ≈ s2
+
+end
+
+function testerror1()
+
+    stfrblochsim(1, 1000, 100, 0, 1, 8, 3, 0, 0, 0, how = :error)
+    return false
+
+end
+
+function testerror2()
+
+    stfrblochsim(1, [1], [1000], [100], [0], Int[], 1, 8, 3, 0, 0, 0, how = :error)
+    return false
+
+end
+
 @testset "Bloch Simulation" begin
 
     @testset "Single-Compartment" begin
@@ -128,6 +164,14 @@ end
     @testset "Nonideal Spoiling" begin
 
         @test testnonideal1()
+        @test testnonideal2()
+
+    end
+
+    @testset "Errors" begin
+
+        @test_throws ArgumentError testerror1()
+        @test_throws ArgumentError testerror2()
 
     end
 
