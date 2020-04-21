@@ -1,7 +1,7 @@
 module STFR
 
-using LinearAlgebra: Diagonal
 using BlochSim
+using LinearAlgebra: Diagonal
 
 include("signalmodel.jl")
 include("blochsim.jl")

@@ -90,6 +90,40 @@ function testtwo2()
 
 end
 
+function testthree1()
+
+    M0 = 1
+    ff = 0.15
+    fm = 0.1
+    T1f = 400
+    T1s = 1000
+    T1m = 1000
+    T2f = 20
+    T2s = 80
+    T2m = 0.01
+    τfs = 100
+    τfm = 50
+    Δωf = 15 * 2π
+    Δω = 0
+    κ = 1
+    Tfree = 8
+    Tg = 3
+    α = deg2rad(15)
+    β = deg2rad(15)
+    ϕ = 0
+    TE = 4
+    frac = [ff, 1 - ff - fm, fm]
+    T1 = [T1f, T1s, T1m]
+    T2 = [T2f, T2s, T2m]
+    Δω2 = [Δω + Δωf, Δω, Δω]
+    τ = [τfs, τfm, τfs * (1 - ff - fm) / ff, Inf, Inf, Inf]
+    s1 = stfrblochsim(M0, ff, fm, T1f, T1s, T1m, T2f, T2s, T2m, τfs, τfm, Δωf,
+                      Δω, κ, Tfree, Tg, α, β, ϕ, TE)
+    s2 = stfrblochsim(M0, frac, T1, T2, Δω2, τ, κ, Tfree, Tg, α, β, ϕ, TE)
+    return s1 ≈ s2
+
+end
+
 function testnonideal1()
 
     M0 = [1.04, 0.8, 1.3]
@@ -158,6 +192,12 @@ end
 
         @test testtwo1()
         @test testtwo2()
+
+    end
+
+    @testset "Three-Compartment" begin
+
+        @test testthree1()
 
     end
 
