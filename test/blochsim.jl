@@ -186,8 +186,9 @@ function testnoninstant1()
     τ = [[Inf, Inf]]
     s1 = stfr.(M0', ff', T1f', T1s', T2f', T2s', Δωf', Δω', κ', Tfree, Tg, α, β, ϕ)
     s2 = stfrblochsim.(M0', frac, T1, T2, Δω2, τ, κ', Tfree, Tg, α, β, ϕ,
-                       rfduration = 0.002, nrf = 11)
-    return s1 ≈ s2
+                       rfduration = 0.002)
+
+    return isapprox(s1, s2, atol = 1e-4)
 
 end
 

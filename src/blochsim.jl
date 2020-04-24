@@ -70,7 +70,7 @@ end
 
 """
     stfrblochsim(M0, frac, T1, T2, Δω, τ, κ, Tfree, Tg, α, β, ϕ, [TE];
-                 how, kwargs...)
+                 rfduration, nrf, how, kwargs...)
 
 Calculate the STFR signal of a multi-compartment spin using Bloch simulation.
 
@@ -89,6 +89,10 @@ Calculate the STFR signal of a multi-compartment spin using Bloch simulation.
 - `β::Real`: Tip-up angle (rad)
 - `ϕ::Real`: Phase of tip-up RF pulse (rad)
 - `TE::Real = Tfree / 2`: Echo time (ms)
+- `rfduration::Real = 0`: Duration of RF pulses (ms); default is to assume
+  instantaneous excitations
+- `nrf::Integer = 401`: Number of RF time points; only used if `rfduration` is
+  nonzero
 - `how::Symbol = :ideal`: See docstring for single-compartment `stfrblochsim`
 
 # Return
@@ -114,7 +118,7 @@ function stfrblochsim(
 
     spin = SpinMC(M0, frac, T1, T2, Δω / 2π, τ)
     if how == :ideal
-        return stfrblochsim(spin, Tfree, Tg, κ * α, κ * β, ϕ, TE)
+        return stfrblochsim(spin, Tfree, Tg, κ * α, κ * β, ϕ, TE; kwargs...)
     elseif how == :grad || how == :rfspoil
         return stfrblochsim_avg(spin, Tfree, Tg, κ * α, κ * β, ϕ, TE, how;
                                 kwargs...)
