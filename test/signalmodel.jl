@@ -1,5 +1,3 @@
-using STFR, Test, MAT
-
 # Test single-compartment STFR for scalar inputs
 # Output should be a scalar; size of scalar is ()
 function stfr1_size1()

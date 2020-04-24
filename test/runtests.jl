@@ -1,4 +1,7 @@
-tests = ["signalmodel", "blochsim"]
-for t in tests
-    include("$(t).jl")
+using MAT
+using STFR
+using Test
+@testset "STFR.jl" begin
+    include("signalmodel.jl")
+    include("blochsim.jl")
 end

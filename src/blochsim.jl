@@ -1,5 +1,6 @@
 """
-    stfrblochsim(M0, T1, T2, Δω, κ, Tfree, Tg, α, β, ϕ, [TE]; how, kwargs...)
+    stfrblochsim(M0, T1, T2, Δω, κ, Tfree, Tg, α, β, ϕ, [TE]; rfduration, nrf,
+                 how, kwargs...)
 
 Calculate the STFR signal of a single-compartment spin using Bloch simulation.
 
@@ -15,24 +16,23 @@ Calculate the STFR signal of a single-compartment spin using Bloch simulation.
 - `β::Real`: Tip-up angle (rad)
 - `ϕ::Real`: Phase of tip-up RF pulse (rad)
 - `TE::Real = Tfree / 2`: Echo time (ms)
+- `rfduration::Real = 0`: Duration of RF pulses (ms); default is to assume
+  instantaneous excitations
+- `nrf::Integer = 401`: Number of RF time points; only used if `rfduration` is
+  nonzero
 - `how::Symbol = :ideal`: Specify what assumptions to make in the Bloch
   simulation; options:
-  - `:ideal`: Assume instantaneous RF pulses and ideal spoiling; this option
-    accepts no additional keyword arguments
+  - `:ideal`: Assume ideal spoiling; this option accepts no additional keyword
+    arguments
   - `:grad`: Assume nonideal gradient spoiling (no RF spoiling); this option
     can accept the following additional keyword arguments:
     - `nspins::Integer = 40`: Number of spins to simulate; the returned
       value will be the complex mean of the spin ensemble
     - `ncycles::Real = 1`: Number of cycles of phase caused by the spoiler
       gradient across the `nspins` spins (typically integer-valued)
-    - `rfduration::Real = 0`: Duration of RF pulses (ms); default is to assume
-      instantaneous excitations
-    - `nrf::Integer = 201`: Number of RF time points; only used if `rfduration`
-      is nonzero
   - `:rfspoil`: Assume nonideal gradient and RF spoiling; this option can accept
     the following additional keyword arguments:
-    - `nspins`, `ncycles`, `rfduration`, and `nrf`, which are described under
-      option `:grad`
+    - `nspins` and `ncycles`, which are described under option `:grad`
     - `Δθinc::Real = deg2rad(117)`: Quadratic RF phase increment (rad)
     - `nTR::Integer = 100`: Number of TR's to simulate to produce a pseudo
       steady-state
@@ -58,7 +58,7 @@ function stfrblochsim(
 
     spin = Spin(M0, T1, T2, Δω / 2π)
     if how == :ideal
-        return stfrblochsim(spin, Tfree, Tg, κ * α, κ * β, ϕ, TE)
+        return stfrblochsim(spin, Tfree, Tg, κ * α, κ * β, ϕ, TE; kwargs...)
     elseif how == :grad || how == :rfspoil
         return stfrblochsim_avg(spin, Tfree, Tg, κ * α, κ * β, ϕ, TE, how;
                                 kwargs...)
@@ -187,7 +187,7 @@ function stfrblochsim(
 end
 
 """
-    stfrblochsim(spin, Tfree, Tg, α, β, ϕ, TE)
+    stfrblochsim(spin, Tfree, Tg, α, β, ϕ, TE; rfduration, nrf)
 
 Simulate the steady-state signal acquired from STFR, assuming instantaneous
 excitations and ideal spoiling.
@@ -199,17 +199,36 @@ function stfrblochsim(
     α::Real,
     β::Real,
     ϕ::Real,
-    TE::Real
+    TE::Real;
+    rfduration::Real = 0,
+    nrf::Integer = 401
 )
 
-    (Atd, _) = excitation(spin, 0, α)
-    (Atu, _) = excitation(spin, ϕ, -β)
-    (Atf, Btf) = freeprecess(spin, Tfree)
-    (Atg, Btg) = freeprecess(spin, Tg)
+    if rfduration == 0
+        # Precompute spin dynamics
+        (Atd, Btd) = excitation(spin, 0 ,α)
+        (Atu, Btu) = excitation(spin, ϕ, -β)
+    else
+        # Compute the time step
+        dt = rfduration / nrf
+        # Generate waveforms for the RF pulses
+        rftd = getrf(α, dt, nrf)
+        rftu = getrf(-β, dt, nrf)
+        # Precompute spin dynamics
+        (Atd, Btd) = excitation(spin, rftd, 0, [0, 0, 0], dt)
+        (Atu, Btu) = excitation(spin, rftu, ϕ, [0, 0, 0], dt)
+    end
+    (Atf, Btf) = freeprecess(spin, Tfree - rfduration)
+    (Atg, Btg) = freeprecess(spin, Tg - rfduration)
     S = spoil(spin)
+
+    # Compute steady state magnetization
     M = (Diagonal(ones(Bool, size(S, 1))) - Atd * S * Atg * Atu * Atf) \
-        (Atd * (S * (Atg * (Atu * Btf))) + Atd * (S * Btg))
-    (Ate, Bte) = freeprecess(spin, TE)
+        (Atd * (S * (Atg * (Atu * Btf))) + Atd * (S * (Atg * Btu)) +
+         Atd * (S * Btg) + Btd)
+
+    # Compute signal at echo time
+    (Ate, Bte) = freeprecess(spin, TE - rfduration)
     M = Ate * M + Bte
     return complex(sum(M[1:3:end]), sum(M[2:3:end]))
 
@@ -229,7 +248,7 @@ function stfrblochsim_avg(
     Δθinc::Real = deg2rad(117),
     nTR::Integer = 300,
     rfduration::Real = 0,
-    nrf::Integer = 201
+    nrf::Integer = 401
 )
 
     # Pick an arbitrary gradient strength and compute the spatial locations that
@@ -301,7 +320,7 @@ function stfrblochsim(
     Dtd = excitation(spin, 0, α)
     Dte = freeprecess(spin, TE)
     Dtr = freeprecess(spin, Tfree - TE)
-    Dtu = excitation(spin, 0, -β)
+    Dtu = excitation(spin, ϕ, -β)
     Dtg = freeprecess(spin, Tg, grad)
 
     # Calculate steady-state magnetization immediately following excitation
@@ -339,7 +358,7 @@ function stfrblochsim(
     Dtd = excitation(spin, rftd, 0, [0, 0, 0], dt)
     Dte = freeprecess(spin, TE - rfduration)
     Dtr = freeprecess(spin, Tfree - TE)
-    Dtu = excitation(spin, rftu, 0, [0, 0, 0], dt)
+    Dtu = excitation(spin, rftu, ϕ, [0, 0, 0], dt)
     Dtg = freeprecess(spin, Tg - rfduration, grad)
 
     # Calculate steady-state magnetization immediately following excitation
@@ -383,7 +402,7 @@ function stfrblochsim(
         (A, B) = excitation(spin, θ, α)
         M = A * M + B
         M = Dtetr[1] * M + Dtetr[2]
-        (A, B) = excitation(spin, θ, -β)
+        (A, B) = excitation(spin, θ + ϕ, -β)
         M = A * M + B
         M = Dtg[1] * M + Dtg[2]
         θ += Δθ
@@ -439,7 +458,7 @@ function stfrblochsim(
         (A, B) = excitation(spin, rftd, θ, [0, 0, 0], dt)
         M = A * M + B
         M = Dtetr[1] * M + Dtetr[2]
-        (A, B) = excitation(spin, rftu, θ, [0, 0, 0], dt)
+        (A, B) = excitation(spin, rftu, θ + ϕ, [0, 0, 0], dt)
         M = A * M + B
         M = Dtg[1] * M + Dtg[2]
         θ += Δθ
