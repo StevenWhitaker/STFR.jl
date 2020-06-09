@@ -129,68 +129,6 @@ function stfrblochsim(
 end
 
 """
-    stfrblochsim(M0, f1, f3, T11, T12, T13, T21, T22, T23, τ12, τ13, Δω1, Δω, κ,
-        Tfree, Tg, α, β, ϕ, [TE]; how, kwargs...)
-
-Calculate the STFR signal of a three-compartment spin using Bloch simulation.
-The fractions of the three compartments sum to 1 (so only two are specified),
-compartments 2 and 3 do not exchange with each other, and the first compartment
-experiences a frequency shift relative to the other compartments.
-
-# Arguments
-- `M0::Real`: Equilibrium magnetization
-- `fi::Real`: Fraction of ith compartment
-- `T1i::Real`: Spin-lattice recovery time constant for the ith compartment (ms)
-- `T2i::Real`: Spin-spin recovery time constant for the ith compartment (ms)
-- `τij::Real`: Residence time of exchange from compartment i to j (ms)
-- `Δω1::Real`: Off-resonance offset of first compartment (rad/s)
-- `Δω::Real`: Bulk off-resonance frequency (rad/s)
-- `κ::Real`: Variation in tip angles
-- `Tfree::Real`: Free precession time (ms)
-- `Tg::Real`: Spoiler gradient time (ms)
-- `α::Real`: Tip-down angle (rad)
-- `β::Real`: Tip-up angle (rad)
-- `ϕ::Real`: Phase of tip-up RF pulse (rad)
-- `TE::Real = Tfree / 2`: Echo time (ms)
-- `how::Symbol = :ideal`: See docstring for single-compartment `stfrblochsim`
-
-# Return
-- `M::Complex{Float64}`: Signal generated from an STFR scan
-"""
-function stfrblochsim(
-    M0::Real,
-    f1::Real,
-    f3::Real,
-    T11::Real,
-    T12::Real,
-    T13::Real,
-    T21::Real,
-    T22::Real,
-    T23::Real,
-    τ12::Real,
-    τ13::Real,
-    Δω1::Real,
-    Δω::Real,
-    κ::Real,
-    Tfree::Real,
-    Tg::Real,
-    α::Real,
-    β::Real,
-    ϕ::Real,
-    TE::Real = Tfree / 2;
-    kwargs...
-)
-
-    frac = [f1, 1 - f1 - f3, f3]
-    T1 = [T11, T12, T13]
-    T2 = [T21, T22, T23]
-    Δω = [Δω + Δω1, Δω, Δω]
-    τ = [τ12, τ13, τ12 * (1 - f1 - f3) / f1, Inf, Inf, Inf]
-    return stfrblochsim(M0, frac, T1, T2, Δω, τ, κ, Tfree, Tg, α, β, ϕ, TE; kwargs...)
-
-end
-
-"""
     stfrblochsim(spin, Tfree, Tg, α, β, ϕ, TE; rfduration, nrf)
 
 Simulate the steady-state signal acquired from STFR, assuming instantaneous
