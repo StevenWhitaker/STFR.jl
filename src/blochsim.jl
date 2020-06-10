@@ -266,7 +266,7 @@ function stfrblochsim(
     Dtg = freeprecess(spin, Tg, grad)
 
     # Calculate steady-state magnetization immediately following excitation
-    (A, B) = combine(Dte, Dtr, Dtu, Dtg, Dtd)
+    (A, B) = BlochSim.combine(Dte, Dtr, Dtu, Dtg, Dtd)
     M = (Diagonal(ones(Bool, size(A, 1))) - A) \ B
 
     # Calculate steady-state signal at echo time
@@ -304,7 +304,7 @@ function stfrblochsim(
     Dtg = freeprecess(spin, Tg - rfduration, grad)
 
     # Calculate steady-state magnetization immediately following excitation
-    (A, B) = combine(Dte, Dtr, Dtu, Dtg, Dtd)
+    (A, B) = BlochSim.combine(Dte, Dtr, Dtu, Dtg, Dtd)
     M = (Diagonal(ones(Bool, size(A, 1))) - A) \ B
 
     # Calculate steady-state signal at echo time
@@ -330,7 +330,7 @@ function stfrblochsim(
     # Precompute spin dynamics
     Dte = freeprecess(spin, TE)
     Dtr = freeprecess(spin, Tfree - TE)
-    Dtetr = combine(Dte, Dtr)
+    Dtetr = BlochSim.combine(Dte, Dtr)
     Dtg = freeprecess(spin, Tg, grad)
 
     # Initialize RF spoiling parameters
@@ -386,7 +386,7 @@ function stfrblochsim(
     # Precompute spin dynamics
     Dte = freeprecess(spin, TE - rfduration)
     Dtr = freeprecess(spin, Tfree - TE)
-    Dtetr = combine(Dte, Dtr)
+    Dtetr = BlochSim.combine(Dte, Dtr)
     Dtg = freeprecess(spin, Tg - rfduration, grad)
 
     # Initialize RF spoiling parameters
