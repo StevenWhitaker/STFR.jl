@@ -420,7 +420,7 @@ end
 """
     getrf(α, dt, nrf)
 
-Get a Gaussian RF waveform.
+Get a sinc RF waveform.
 
 # Arguments
 - `α::Real`: Flip angle (rad)
@@ -436,7 +436,7 @@ function getrf(
     nrf::Integer
 )
 
-    rfshape = normpdf.(LinRange(-3, 3, nrf)) # Shape of RF pulse
+    rfshape = sinc.(LinRange(-4, 4, nrf)) # Shape of RF pulse
     normfact = sum(rfshape) * dt/1000 # Normalization factor (s)
     rfflip = (α / normfact) * rfshape # Normalize RF shape to flip angle (rad/s)
     rf = rfflip / GAMMA # Convert to Gauss (G)
@@ -444,9 +444,6 @@ function getrf(
     return rf
 
 end
-
-normpdf(x, μ, σ) = exp(-(x - μ)^2 / 2σ^2) / (sqrt(2π) * σ)
-normpdf(x) = normpdf(x, 0, 1)
 
 # Avoid string interpolation in the case where how is okay
 @noinline function howerror(how::Symbol)
