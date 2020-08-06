@@ -170,7 +170,7 @@ function stfrblochsim(
          Atd * (S * Btg) + Btd)
 
     # Compute signal at echo time
-    (Ate, Bte) = freeprecess(spin, TE - rfduration)
+    (Ate, Bte) = freeprecess(spin, TE - rfduration / 2)
     M = Ate * M + Bte
     return complex(sum(M[1:3:end]), sum(M[2:3:end]))
 
@@ -298,8 +298,8 @@ function stfrblochsim(
 
     # Precompute spin dynamics
     Dtd = excitation(spin, rftd, 0, [0, 0, 0], dt)
-    Dte = freeprecess(spin, TE - rfduration)
-    Dtr = freeprecess(spin, Tfree - TE)
+    Dte = freeprecess(spin, TE - rfduration / 2)
+    Dtr = freeprecess(spin, Tfree - TE - rfduration / 2)
     Dtu = excitation(spin, rftu, ϕ, [0, 0, 0], dt)
     Dtg = freeprecess(spin, Tg - rfduration, grad)
 
@@ -384,8 +384,8 @@ function stfrblochsim(
     rftu = getrf(-β, dt, nrf)
 
     # Precompute spin dynamics
-    Dte = freeprecess(spin, TE - rfduration)
-    Dtr = freeprecess(spin, Tfree - TE)
+    Dte = freeprecess(spin, TE - rfduration / 2)
+    Dtr = freeprecess(spin, Tfree - TE - rfduration / 2)
     Dtetr = BlochSim.combine(Dte, Dtr)
     Dtg = freeprecess(spin, Tg - rfduration, grad)
 
