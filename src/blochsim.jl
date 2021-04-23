@@ -148,7 +148,7 @@ function stfrblochsim(
 
     if rfduration == 0
         # Precompute spin dynamics
-        (Atd, Btd) = excitation(spin, 0 ,α)
+        (Atd, Btd) = excitation(spin, 0, α)
         (Atu, Btu) = excitation(spin, ϕ, -β)
     else
         # Compute the time step
