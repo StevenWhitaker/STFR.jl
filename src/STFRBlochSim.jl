@@ -1,20 +1,43 @@
-struct STFRBlochSim
-    Tfree
-    Tg
-    α
-    β
-    ϕ
-    TE
-    config # Maybe pass this in separately to function, leaning towards keeping it here though
-    # TODO: Can check if TE is valid, i.e., after end of tip-down pulse and before beginning of tip-up pulse
-    # Or maybe just throw a warning if TE is during an RF pulse or during Tg
-end
+struct STFRBlochSim{T1<:AbstractRF,T2<:AbstractRF,T3<:AbstractSpoiling,nTR,save_transients}
+    Tfree::Float64
+    Tg::Float64
+    α::Float64
+    β::Float64
+    ϕ::Float64
+    TE::Float64
+    rftipdown::T1
+    rftipup::T2
+    spoiling::T3
 
-struct STFRBlochSimConfig
-    rftd # TODO: RF object in BlochSim.jl, includes shape, duration, nrf, etc.
-    rftu # TODO: RF object in BlochSim.jl, includes shape, duration, nrf, etc.
-    spoiling # TODO: Spoiling object in BlochSim.jl, subtypes include ideal, grad, rf, etc.
-    transient # Whether to record transient state, possibly object that contains sampling interval, number of TRs, etc.
+    function STFRBlochSim(
+        Tfree,
+        Tg,
+        α,
+        β,
+        ϕ,
+        TE,
+        rftipdown::T1,
+        rftipup::T2,
+        spoiling::T3,
+        nTR::Val{T4},
+        save_transients::Val{T5}
+    ) where {T1<:AbstractRF,T2<:AbstractRF,T3<:AbstractSpoiling,T4,T5}
+
+        Tfree >= TE + duration(rftipup) / 2 ||
+            error("Tfree must be greater than or equal to TE + duration(rftipup) / 2")
+        TE >= duration(rftipdown) / 2 || error("TE must not be during the tip-down pulse")
+        Tg >= duration(rftipup) / 2 + spoiler_gradient_duration(spoiling) + duration(rftipdown) / 2 ||
+            error("Tg must be greater than or equal to duration(rftipup) / 2 + " *
+                  "duration(rftipdown) / 2 + spoiler_gradient_duration")
+        (T4 isa Int && T4 >= 0) || error("nTR must be a nonnegative Int")
+        T3 <: Union{<:RFSpoiling,<:RFandGradientSpoiling} && (T4 > 0 ||
+            error("nTR must be positive when simulating RF spoiling"))
+        T5 isa Bool || error("save_transients must be a Bool")
+        T4 == 0 && T5 &&
+            @warn("save_transients is true, but nTR = 0; no transients will be saved")
+        new{T1,T2,T3,T4,T5}(Tfree, Tg, α, β, ϕ, TE, rftipdown, rftipup, spoiling)
+
+    end
 end
 
 struct STFRBlochSimWorkspace
@@ -32,71 +55,31 @@ struct STFRBlochSimWorkspace
     bm_workspace::Union{Nothing,<:BlochMcConnellWorkspace} # Maybe? Instead of SpinCollection
 end
 
-# Different for ideal/gradient spoiling vs rf spoiling
-# Different for transient vs not, though can be combined in one function in rf spoiling case
+# Case when nTR = 0
+function (scan::STFRBlochSim{<:AbstractRF,<:AbstractRF,<:AbstractSpoiling,0})(
+    spin::AbstractSpin,
+    workspace::STFRBlochSimWorkspace = STFRBlochSimWorkspace(spin, scan)
+)
 
-# RF spoiling case
-# TODO: Implement
-# - is_transient
-# - tipdown_duration
-# - tipup_duration
-# - spoiler_gradient
-# - rfspoiling_increment
-# - tipdown_pulse
-# - tipup_pulse
-function (scan::STFRBlochSim)(spin::AbstractSpin, workspace::STFRBlochSimWorkspace)
+    rfduration = (duration(scan.rftipdown) + duration(scan.rftipup)) / 2
 
-    transient = is_transient(scan)
+    excite!(workspace.Atd, workspace.Btd, spin, scan.rftipdown, workspace.ex_workspace)
+    freeprecess!(workspace.Atf, workspace.Btf, spin, scan.Tfree - rfduration, workspace.bm_workspace)
+    excite!(workspace.Atu, workspace.Btu, spin, scan.rftipup, workspace.ex_workspace)
+    freeprecess!(workspace.Atg, workspace.Btg, spin, scan.Tg - rfduration - spoiler_gradient_duration(scan.spoiling), workspace.bm_workspace)
+    spoil!(workspace.As, workspace.Bs, spin, scan.spoiling, workspace.bm_workspace)
 
-    freeprecess!(workspace.Ate, workspace.Bte, spin, scan.TE - tipdown_duration(scan) / 2, workspace.bm_workspace)
-    if transient
-        freeprecess!(workspace.Atr, workspace.Btr, spin, scan.Tfree - scan.TE - tipup_duration(scan) / 2, workspace.bm_workspace)
-    else
-        freeprecess!(workspace.Atr, workspace.Btr, spin, scan.Tfree - tipdown_duration(scan) / 2 - tipup_duration(scan) / 2, workspace.bm_workspace)
-    end
-    freeprecess!(workspace.Atg, workspace.Btg, spin, scan.Tg - tipdown_duration(scan) / 2 - tipup_duration(scan) / 2, spoiler_gradient(scan), workspace.bm_workspace)
+    combine!(workspace.tmpA1, workspace.tmpB1, workspace.Atf, workspace.Btf, workspace.Atu, workspace.Btu)
+    combine!(workspace.tmpA2, workspace.tmpB2, workspace.tmpA1, workspace.tmpB1, workspace.Atg, workspace.Btg)
+    combine!(workspace.tmpA1, workspace.tmpB1, workspace.tmpA2, workspace.tmpB2, workspace.Ats, workspace.Bts)
+    combine!(workspace.tmpA2, workspace.tmpB2, workspace.tmpA1, workspace.tmpB1, workspace.Atd, workspace.Btd)
+    subtract!(workspace.mat, I, workspace.tmpA2)
+    copyto!(workspace.vec, workspace.tmpB2)
+    F = lu!(workspace.mat)
+    ldiv!(F, workspace.vec)
+    copyto!(spin.M, workspace.vec)
 
-    if transient
-        Mout = similar(spin.M, 3, numTRs(scan) + 2)
-        Mout[:,1] = spin.M
-    end
-    θ = 0
-    Δθ = rfspoiling_increment(scan)
-    for rep = 1:numTRs(scan)
-
-        # Tip-down
-        excite!(workspace.Atd, workspace.Btd, spin, tipdown_pulse(scan), θ) # TODO: need another workspace?
-        applydynamics!(spin, workspace.BtoM, workspace.Atd, workspace.Btd)
-
-        # Free-precession and readout
-        if transient
-            applydynamics!(spin, workspace.BtoM, workspace.Ate, workspace.Bte)
-            Mout[:,rep+1] = spin.M
-        end
-        applydynamics!(spin, workspace.BtoM, workspace.Atr, workspace.Btr)
-
-        # Tip-up
-        excite!(workspace.Atu, workspace.Btu, spin, tipup_pulse(scan), θ + scan.ϕ)
-        applydynamics!(spin, workspace.BtoM, workspace.Atu, workspace.Btu)
-
-        # Gradient spoiling
-        applydynamics!(spin, workspace.BtoM, workspace.Atg, workspace.Btg)
-
-        # RF spoiling
-        θ += Δθ
-        Δθ += rfspoiling_increment(scan)
-
-    end
-
-    excite!(workspace.Atd, workspace.Btd, spin, tipdown_pulse(scan), θ)
-    applydynamics!(spin, workspace.BtoM, workspace.Atd, workspace.Btd)
-    applydynamics!(spin, workspace.BtoM, workspace.Ate, workspace.Bte)
-    if transient
-        Mout[:,numTRs(scan)+2] = spin.M
-    else
-        Mout = spin.M
-    end
-
-    return Mout
+    freeprecess!(workspace.Atf, workspace.Btf, spin, spin.TE - duration(scan.rftipdown) / 2, workspace.bm_workspace)
+    applydynamics!(spin, workspace.tmpB1, workspace.Atf, workspace.Btf)
 
 end
