@@ -197,7 +197,7 @@ function stfrblochsim_avg(
     # will provide a uniform ncycles of phase
     gradz = 0.3 # G/cm
     zmax = ncycles * 2π / (GAMMA * gradz * (Tg-rfduration)/1000) # cm
-    z = (1:nspins)/nspins  * zmax
+    z = (1:nspins)/nspins * zmax
 
     # Make nspins copies of the provided spin at different spatial locations
     spins = varyz(spin, z)
