@@ -1,21 +1,15 @@
 struct STFRBlochSim{T1<:AbstractRF,T2<:AbstractRF,T3<:AbstractSpoiling,nTR,save_transients}
     Tfree::Float64
     Tg::Float64
-    α::Float64
-    β::Float64
-    ϕ::Float64
     TE::Float64
     rftipdown::T1
     rftipup::T2
     spoiling::T3
 
     function STFRBlochSim(
-        Tfree,
-        Tg,
-        α,
-        β,
-        ϕ,
-        TE,
+        Tfree::Real,
+        Tg::Real,
+        TE::Real,
         rftipdown::T1,
         rftipup::T2,
         spoiling::T3,
@@ -35,10 +29,16 @@ struct STFRBlochSim{T1<:AbstractRF,T2<:AbstractRF,T3<:AbstractSpoiling,nTR,save_
         T5 isa Bool || error("save_transients must be a Bool")
         T4 == 0 && T5 &&
             @warn("save_transients is true, but nTR = 0; no transients will be saved")
-        new{T1,T2,T3,T4,T5}(Tfree, Tg, α, β, ϕ, TE, rftipdown, rftipup, spoiling)
+        new{T1,T2,T3,T4,T5}(Tfree, TE, Tg, rftipdown, rftipup, spoiling)
 
     end
 end
+
+STFRBlochSim(Tfree, Tg, TE, rftipdown, rftipup, spoiling::AbstractSpoiling, nTR::Val = Val(0)) = STFRBlochSim(Tfree, Tg, TE, rftipdown, rftipup, spoiling, nTR, Val(false))
+STFRBlochSim(Tfree, Tg, TE, rftipdown, rftipup, nTR::Val, save_transients::Val = Val(false)) = STFRBlochSim(Tfree, Tg, TE, rftipdown, rftipup, IdealSpoiling(), nTR, save_transients)
+STFRBlochSim(Tfree, Tg, TE, rftipdown, rftipup) = STFRBlochSim(Tfree, Tg, TE, rftipdown, rftipup, IdealSpoiling(), Val(0), Val(false))
+STFRBlochSim(Tfree, Tg, TE, α::Real, rftipup, spoiling, nTR, save_transients) = STFRBlochSim(Tfree, Tg, TE, InstantaneousRF(α), rftipup, spoiling, nTR, save_transients)
+STFRBlochSim(Tfree, Tg, TE, rftipdown, β::Real, ϕ::Real, args...) = STFRBlochSim(Tfree, Tg, TE, rftipdown, InstantaneousRF(-β, ϕ), args...)
 
 struct STFRBlochSimWorkspace
     Ate
