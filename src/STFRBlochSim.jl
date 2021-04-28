@@ -147,8 +147,8 @@ function STFRBlochSimWorkspace(
         tmpB1 = MagnetizationMC{T}(N)
         tmpA2 = BlochMcConnellMatrix{T}(N)
         tmpB2 = MagnetizationMC{T}(N)
-        mat = Matrix{T}(undef, 6, 6)
-        vec = Vector{T}(undef, 6)
+        mat = Matrix{T}(undef, 3N, 3N)
+        vec = Vector{T}(undef, 3N)
     end
     STFRBlochSimWorkspace(Atd, Btd, Ate, Bte, Atf, Btf, Atu, Btu, Atg, Btg, As,
                           Bs, tmpA1, tmpB1, tmpA2, tmpB2, mat, vec,
