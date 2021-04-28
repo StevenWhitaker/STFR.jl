@@ -1,7 +1,7 @@
-struct STFRBlochSim{T1<:AbstractRF,T2<:AbstractRF,T3<:AbstractSpoiling,nTR,save_transients}
-    Tfree::Float64
-    Tg::Float64
-    TE::Float64
+struct STFRBlochSim{T<:Real,T1<:AbstractRF,T2<:AbstractRF,T3<:AbstractSpoiling,nTR,save_transients}
+    Tfree::T
+    Tg::T
+    TE::T
     rftipdown::T1
     rftipup::T2
     spoiling::T3
@@ -29,7 +29,9 @@ struct STFRBlochSim{T1<:AbstractRF,T2<:AbstractRF,T3<:AbstractSpoiling,nTR,save_
         T5 isa Bool || error("save_transients must be a Bool")
         T4 == 0 && T5 &&
             @warn("save_transients is true, but nTR = 0; no transients will be saved")
-        new{T1,T2,T3,T4,T5}(Tfree, Tg, TE, rftipdown, rftipup, spoiling)
+        args = promote(Tfree, Tg, TE)
+        T = typeof(args[1])
+        new{T,T1,T2,T3,T4,T5}(args..., rftipdown, rftipup, spoiling)
 
     end
 end
@@ -76,7 +78,7 @@ end
 
 function STFRBlochSimWorkspace(
     spin::Union{Type{Spin{T}},Type{SpinMC{T,N}}},
-    scan::Type{<:STFRBlochSim{T1,T2,T3}},
+    scan::Type{<:STFRBlochSim{<:Real,T1,T2,T3}},
     bm_workspace = spin <: Spin ? nothing : BlochMcConnellWorkspace(spin)
 ) where {T,N,T1,T2,T3}
 
@@ -155,7 +157,7 @@ function STFRBlochSimWorkspace(
 end
 
 # Case when nTR = 0
-function (scan::STFRBlochSim{<:AbstractRF,<:AbstractRF,<:AbstractSpoiling,0})(
+function (scan::STFRBlochSim{<:Real,<:AbstractRF,<:AbstractRF,<:AbstractSpoiling,0})(
     spin::AbstractSpin,
     workspace::STFRBlochSimWorkspace = STFRBlochSimWorkspace(spin, scan)
 )
@@ -184,7 +186,7 @@ function (scan::STFRBlochSim{<:AbstractRF,<:AbstractRF,<:AbstractSpoiling,0})(
 end
 
 # Case when nTR > 0
-function (scan::STFRBlochSim{<:AbstractRF,<:AbstractRF,T,nTR,save})(
+function (scan::STFRBlochSim{<:Real,<:AbstractRF,<:AbstractRF,T,nTR,save})(
     spin::AbstractSpin,
     workspace::STFRBlochSimWorkspace = STFRBlochSimWorkspace(spin, scan)
 ) where {T,nTR,save}
