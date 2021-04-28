@@ -266,61 +266,82 @@ function testnoninstant1()
         s2[i,j] = signal(spin)
     end
 
-    return isapprox(s1, s2, atol = 1e-4)
+    return isapprox(s1, s2, atol = 1e-5)
 
 end
 
 function testnoninstant2()
 
     M0 = [1.04, 0.8, 1.3]
-    frac = permutedims([[1], [1], [1]])
-    T1 = permutedims([[833], [900], [1100]])
-    T2 = permutedims([[76], [90], [100]])
-    Δω = permutedims([[10], [0], [30]] * 2π)
-    τ = permutedims([Int[], Int[], Int[]])
+    frac = [(0.1, 0.9), (0.15, 0.85), (0.2, 0.8)]
+    T1 = [(300, 833), (400, 900), (800, 1100)]
+    T2 = [(10, 76), (15, 90), (20, 100)]
+    Δf = [(0, 0), (10, 0), (30, 10)]
+    τ = [(20, 100), (30, 130), (70, 70)]
     κ = [0.9, 1, 1.1]
     Tfree = [8, 10]
     Tg = [3, 4]
     α = deg2rad.([15, 14])
     β = deg2rad.([13, 3])
     ϕ = deg2rad.([30, 0])
+    Δt = 0.5
+    s1 = Matrix{ComplexF64}(undef, length(Tfree), length(M0))
+    s2 = similar(s1)
+    w1 = STFRBlochSimWorkspace(SpinMC{Float64,2}, STFRBlochSim{RF,RF,GradientSpoiling})
+    w2 = STFRBlochSimWorkspace(SpinMC{Float64,2}, STFRBlochSim{RF,RF,RFandGradientSpoiling})
+    spoil1 = GradientSpoiling(1, 2, 3, 1)
+    spoil2 = RFandGradientSpoiling(spoil1, 2π)
+    nTR = Val(2000)
+    for j = 1:length(M0), i = 1:length(Tfree)
+        spin = SpinMC(M0[j], frac[j], T1[j], T2[j], Δf[j], τ[j], Position(1, 1, 1))
+        rftipdown = RF(fill(κ[j] * α[i] * 1000 / Δt / GAMMA / 3, 3), Δt)
+        rftipup = RF(fill(κ[j] * -β[i] * 1000 / Δt / GAMMA / 3, 3), Δt, ϕ[i])
+        stfrblochsim! = STFRBlochSim(Tfree[i], Tg[i], Tfree[i] / 2, rftipdown, rftipup, spoil1)
+        stfrblochsim!(spin, w1)
+        s1[i,j] = signal(spin)
+        for k = 1:2 spin.M[k].x = 0; spin.M[k].y = 0; spin.M[k].z = frac[j][k] * M0[j] end
+        stfrblochsim! = STFRBlochSim(Tfree[i], Tg[i], Tfree[i] / 2, rftipdown, rftipup, spoil2, nTR)
+        stfrblochsim!(spin, w2)
+        s2[i,j] = signal(spin)
+    end
+
+    return s1 ≈ s2
     s1 = stfrblochsim.(M0', frac, T1, T2, Δω, τ, κ', Tfree, Tg, α, β, ϕ,
                        how = :grad, rfduration = 2, nrf = 11)
     s2 = stfrblochsim.(M0', frac, T1, T2, Δω, τ, κ', Tfree, Tg, α, β, ϕ,
                        how = :rfspoil, rfduration = 2, nrf = 11, Δθinc = 2π,
                        nTR = 2000)
-    return s1 ≈ s2
 
 end
 
 @testset "Bloch Simulation" begin
 
-#    @testset "Single-Compartment" begin
-#
-#        @test testone1()
-#        @test testone2()
-#
-#    end
-#
-#    @testset "Two-Compartment" begin
-#
-#        @test testtwo1()
-#        @test testtwo2()
-#
-#    end
-#
-#    @testset "Nonideal Spoiling" begin
-#
-#        @test testnonideal1()
-#        @test testnonideal2()
-#        @test testnonideal3()
-#
-#    end
+    @testset "Single-Compartment" begin
+
+        @test testone1()
+        @test testone2()
+
+    end
+
+    @testset "Two-Compartment" begin
+
+        @test testtwo1()
+        @test testtwo2()
+
+    end
+
+    @testset "Nonideal Spoiling" begin
+
+        @test testnonideal1()
+        @test testnonideal2()
+        @test testnonideal3()
+
+    end
 
     @testset "Non-instantaneous Excitation" begin
 
         @test testnoninstant1()
-#        @test testnoninstant2()
+        @test testnoninstant2()
 
     end
 

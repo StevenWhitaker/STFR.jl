@@ -5,6 +5,6 @@ using STFR
 using Test
 
 @testset "STFR.jl" begin
-#    include("signalmodel.jl")
+    include("signalmodel.jl")
     include("blochsim.jl")
 end
