@@ -78,10 +78,10 @@ STFRBlochSim(Tfree, Tg, TE, rftipdown, rftipup) = STFRBlochSim(Tfree, Tg, TE, rf
 STFRBlochSim(Tfree, Tg, TE, α::Real, rftipup, spoiling::AbstractSpoiling, nTR, save_transients) = STFRBlochSim(Tfree, Tg, TE, InstantaneousRF(α), rftipup, spoiling, nTR, save_transients)
 STFRBlochSim(Tfree, Tg, TE, rftipdown, β::Real, ϕ::Real, args...) = STFRBlochSim(Tfree, Tg, TE, rftipdown, InstantaneousRF(-β, ϕ), args...)
 
-Base.show(io::IO, stfr::STFRBlochSim{<:AbstractRF,<:AbstractRF,<:AbstractSpoiling,nTR,save}) where {nTR,save} =
+Base.show(io::IO, stfr::STFRBlochSim{<:Real,<:AbstractRF,<:AbstractRF,<:AbstractSpoiling,nTR,save}) where {nTR,save} =
     print(io, "STFRBlochSim(", stfr.Tfree, ", ", stfr.Tg, ", ", stfr.TE, ", ", stfr.rftipdown, ", ", stfr.rftipup, ", ", stfr.spoiling, ", Val(", nTR, "), Val(", save, "))")
 
-function Base.show(io::IO, ::MIME"text/plain", stfr::STFRBlochSim{<:AbstractRF,<:AbstractRF,<:AbstractSpoiling,nTR,save}) where {nTR,save}
+function Base.show(io::IO, ::MIME"text/plain", stfr::STFRBlochSim{<:Real,<:AbstractRF,<:AbstractRF,<:AbstractSpoiling,nTR,save}) where {nTR,save}
 
     print(io, "Small-Tip Fast Recovery (STFR) Bloch Simulation:")
     print(io, "\n Tfree = ", stfr.Tfree, " ms")
