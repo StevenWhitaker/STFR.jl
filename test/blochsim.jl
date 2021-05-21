@@ -152,7 +152,7 @@ function testnonideal1()
         stfrblochsim!(spin, w2)
         s2[i,j] = signal(spin)
         spin.M.x = 0; spin.M.y = 0; spin.M.z = M0[j]
-        stfrblochsim! = STFRBlochSim(Tfree[i], Tg[i], Tfree[i] / 2, κ[j] * α[i], κ[j] * β[i], ϕ[i], spoil3, nTR)
+        stfrblochsim! = STFRBlochSim(Tfree[i], Tg[i], Tfree[i] / 2, κ[j] * α[i], κ[j] * β[i], ϕ[i], spoil3, nTR, Val(true))
         stfrblochsim!(spin, w3)
         s3[i,j] = signal(spin)
     end
@@ -195,7 +195,7 @@ function testnonideal2()
         stfrblochsim!(spin, w2)
         s2[i,j] = signal(spin)
         for k = 1:2 spin.M[k].x = 0; spin.M[k].y = 0; spin.M[k].z = frac[j][k] * M0[j] end
-        stfrblochsim! = STFRBlochSim(Tfree[i], Tg[i], Tfree[i] / 2, κ[j] * α[i], κ[j] * β[i], ϕ[i], spoil3, nTR)
+        stfrblochsim! = STFRBlochSim(Tfree[i], Tg[i], Tfree[i] / 2, κ[j] * α[i], κ[j] * β[i], ϕ[i], spoil3, nTR, Val(true))
         stfrblochsim!(spin, w3)
         s3[i,j] = signal(spin)
     end
@@ -317,6 +317,36 @@ function testnoninstant2()
 
 end
 
+function testnoninstant3()
+
+    M0 = 1
+    T1 = 1000
+    T2 = 100
+    Δf = 0
+    Tfree = 8
+    Tg = 2.8
+    TE = Tfree / 2
+    α = deg2rad(15)
+    β = deg2rad(15)
+    ϕ = 0
+    Δt = 0.001
+    rftipdown = RF([α * 1000 / Δt / GAMMA], Δt)
+    rftipup = RF([-β * 1000 / Δt / GAMMA], Δt)
+
+    spin = Spin(M0, T1, T2, Δf)
+    stfr! = STFRBlochSim(Tfree, Tg, TE, rftipdown, rftipup, Val(2000))
+    stfr!(spin)
+    s1 = spin.M
+
+    spin = Spin(M0, T1, T2, Δf)
+    stfr! = STFRBlochSim(Tfree, Tg, TE, α, β, ϕ, Val(2000))
+    stfr!(spin)
+    s2 = spin.M
+
+    return s1 ≈ s2
+
+end
+
 @testset "Bloch Simulation" begin
 
     @testset "Single-Compartment" begin
@@ -345,6 +375,7 @@ end
 
         @test testnoninstant1()
         @test testnoninstant2()
+        @test testnoninstant3()
 
     end
 
