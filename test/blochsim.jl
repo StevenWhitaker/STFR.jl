@@ -225,7 +225,7 @@ function testnonideal3()
         stfrblochsim!(spin, workspace)
         add!(M2, spin.M)
     end
-    rdiv!(M2, nz)
+    div!(M2, nz)
 
     return isapprox(M1, M2; atol = 1e-4)
 
@@ -306,11 +306,6 @@ function testnoninstant2()
     end
 
     return s1 ≈ s2
-    s1 = stfrblochsim.(M0', frac, T1, T2, Δω, τ, κ', Tfree, Tg, α, β, ϕ,
-                       how = :grad, rfduration = 2, nrf = 11)
-    s2 = stfrblochsim.(M0', frac, T1, T2, Δω, τ, κ', Tfree, Tg, α, β, ϕ,
-                       how = :rfspoil, rfduration = 2, nrf = 11, Δθinc = 2π,
-                       nTR = 2000)
 
 end
 
