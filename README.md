@@ -23,7 +23,7 @@ schemes. (See [BlochSim.jl](https://github.com/StevenWhitaker/BlochSim.jl) for
 different subtypes of `AbstractRF` and `AbstractSpoiling`.) In addition,
 `STFRBlochSim` can be used for spins with an arbitrary number of compartments
 with exchange (see `Spin` and `SpinMC` in
-[BlochSim.jl](https://github.com/StevenWhitaker/BlochSim.jl).
+[BlochSim.jl](https://github.com/StevenWhitaker/BlochSim.jl)).
 
 ## Getting Started
 
@@ -40,6 +40,7 @@ Next, there are two ways to add this package to your Julia environment.
    is needed). When an update becomes available, you will need to manually add
    the updated version of STFR (e.g., with
    `add https://github.com/StevenWhitaker/STFR.jl#v2.0.1`).
+
 After the package has been installed, hit backspace to return to the normal
 Julia prompt, and then type `using STFR` to load the package.
 
@@ -56,7 +57,7 @@ julia> sig = stfr(1, 1000, 100, 3.75 * 2π, 1, 8, 3, π/12, π/12, 0, 4) # Spoil
 julia> stfr(1, 1000, 100, 3.75 * 2π, 1, 8, 3, π/12, π/12, 0, 4, Val(false)) # No RF spoiling
 0.009194809492086849 + 0.16021302758102335im
 
-julia> spin = Spin(1, 1000, 100, 3.75)
+julia> spin = Spin(1, 1000, 100, 3.75) # From BlochSim.jl
 Spin{Float64}:
  M = Magnetization(0.0, 0.0, 1.0)
  M0 = 1.0
