@@ -1,12 +1,14 @@
 name = "STFR"
 uuid = "e905d6ce-5d58-11e9-2213-8b5d9f240645"
 authors = ["Steven Whitaker <stwhit@umich.edu>"]
-version = "1.1.3"
+version = "2.0.0-DEV"
 
 [deps]
 BlochSim = "5c0f8cbe-99a4-11e9-108b-216da9629524"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 
 [compat]
-BlochSim = "0.2, 0.3, 0.4"
+BlochSim = "0.5"
+Reexport = "1"
 julia = "1.2"
