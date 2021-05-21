@@ -1,453 +1,347 @@
 """
-    stfrblochsim(M0, T1, T2, Δω, κ, Tfree, Tg, α, β, ϕ, [TE]; rfduration, nrf,
-                 how, kwargs...)
+    stfr! = STFRBlochSim(Tfree, Tg, TE, rftipdown, rftipup, [spoiling], [nTR], [save_transients])
+    stfr! = STFRBlochSim(Tfree, Tg, TE, rftipdown, β, ϕ, [spoiling], [nTR], [save_transients])
+    stfr!(spin, [workspace])
 
-Calculate the STFR signal of a single-compartment spin using Bloch simulation.
-
-# Arguments
-- `M0::Real`: Equilibrium magnetization
-- `T1::Real`: Spin-lattice recovery time constant (ms)
-- `T2::Real`: Spin-spin recovery time constant (ms)
-- `Δω::Real`: Off-resonance frequency (rad/s)
-- `κ::Real`: Variation in tip angles
-- `Tfree::Real`: Free precession time (ms)
-- `Tg::Real`: Spoiler gradient time (ms)
-- `α::Real`: Tip-down angle (rad)
-- `β::Real`: Tip-up angle (rad)
-- `ϕ::Real`: Phase of tip-up RF pulse (rad)
-- `TE::Real = Tfree / 2`: Echo time (ms)
-- `rfduration::Real = 0`: Duration of RF pulses (ms); default is to assume
-  instantaneous excitations
-- `nrf::Integer = 401`: Number of RF time points; only used if `rfduration` is
-  nonzero
-- `how::Symbol = :ideal`: Specify what assumptions to make in the Bloch
-  simulation; options:
-  - `:ideal`: Assume ideal spoiling; this option accepts no additional keyword
-    arguments
-  - `:grad`: Assume nonideal gradient spoiling (no RF spoiling); this option
-    can accept the following additional keyword arguments:
-    - `nspins::Integer = 40`: Number of spins to simulate; the returned
-      value will be the complex mean of the spin ensemble
-    - `ncycles::Real = 1`: Number of cycles of phase caused by the spoiler
-      gradient across the `nspins` spins (typically integer-valued)
-  - `:rfspoil`: Assume nonideal gradient and RF spoiling; this option can accept
-    the following additional keyword arguments:
-    - `nspins` and `ncycles`, which are described under option `:grad`
-    - `Δθinc::Real = deg2rad(117)`: Quadratic RF phase increment (rad)
-    - `nTR::Integer = 100`: Number of TR's to simulate to produce a pseudo
-      steady-state
-
-# Return
-- `M::Complex{Float64}`: Signal generated from an STFR scan
-"""
-function stfrblochsim(
-    M0::Real,
-    T1::Real,
-    T2::Real,
-    Δω::Real,
-    κ::Real,
-    Tfree::Real,
-    Tg::Real,
-    α::Real,
-    β::Real,
-    ϕ::Real,
-    TE::Real = Tfree / 2;
-    how::Symbol = :ideal,
-    kwargs...
-)
-
-    spin = Spin(M0, T1, T2, Δω / 2π)
-    if how == :ideal
-        return stfrblochsim(spin, Tfree, Tg, κ * α, κ * β, ϕ, TE; kwargs...)
-    elseif how == :grad || how == :rfspoil
-        return stfrblochsim_avg(spin, Tfree, Tg, κ * α, κ * β, ϕ, TE, how;
-                                kwargs...)
-    else
-        howerror(how)
-    end
-
-end
-
-"""
-    stfrblochsim(M0, frac, T1, T2, Δω, τ, κ, Tfree, Tg, α, β, ϕ, [TE];
-                 rfduration, nrf, how, kwargs...)
-
-Calculate the STFR signal of a multi-compartment spin using Bloch simulation.
+Simulate a small-tip fast recovery (STFR) scan on `spin`, overwriting the spin's
+magnetization vector. The resultant magnetization is stored in `spin.M`. If
+`nTR > 0` and `save_transients === true`, then `stfr!(...)` returns a `Vector`
+with the magnetization vectors at the echo time for each of the `nTR` simulated
+TRs.
 
 # Arguments
-- `M0::Real`: Equilibrium magnetization
-- `frac::AbstractArray{<:Real,1}`: Volume fraction of each compartment
-- `T1::AbstractArray{<:Real,1}`: Spin-lattice recovery time constants (ms)
-- `T2::AbstractArray{<:Real,1}`: Spin-spin recovery time constants (ms)
-- `Δω::AbstractArray{<:Real,1}`: Off-resonance frequencies (rad/s)
-- `τ::AbstractArray{<:Real,1}`: Residence times (ms); of form
-  [τ12, τ13, ..., τ1N, τ21, τ23, ..., τ2N, ...]
-- `κ::Real`: Variation in tip angles
-- `Tfree::Real`: Free precession time (ms)
-- `Tg::Real`: Spoiler gradient time (ms)
-- `α::Real`: Tip-down angle (rad)
-- `β::Real`: Tip-up angle (rad)
-- `ϕ::Real`: Phase of tip-up RF pulse (rad)
-- `TE::Real = Tfree / 2`: Echo time (ms)
-- `rfduration::Real = 0`: Duration of RF pulses (ms); default is to assume
-  instantaneous excitations
-- `nrf::Integer = 401`: Number of RF time points; only used if `rfduration` is
-  nonzero
-- `how::Symbol = :ideal`: See docstring for single-compartment `stfrblochsim`
+- `Tfree::Real`: Time from the center of the tip-down RF pulse to the center of
+  the tip-up RF pulse (ms)
+- `Tg::Real`: Time from the center of the tip-up RF pulse to the center of the
+  tip-down RF pulse (ms); gradient spoiling occurs during this time
+- `TE::Real`: Echo time (ms)
+- `rftipdown`:
+  - `::Real`: Excitation (tip-down) flip angle (rad) (assumes an instantaneous
+    RF pulse)
+  - `::AbstractRF`: Excitation (tip-down) RF pulse
+- One of the following:
+  - Either
+    - `β::Real`: Tip-up flip angle (rad) (assumes an instantaneous RF pulse)
+    - `ϕ::Real`: Tip-up phase (rad)
+  - or
+    - `rftipup::AbstractRF`: Tip-up RF pulse
+- `spoiling::AbstractSpoiling = IdealSpoiling()`: Type of spoiling to apply
+- `nTR::Val = Val(0)`: Number of TRs to simulate; `Val(0)` indicates to simulate
+  a steady-state scan
+- `save_transients::Val = Val(false)`: Whether or not to return the
+  magnetization vectors at the TE for each of the `nTR` simulated TRs; does
+  nothing if `nTR == 0`
 
-# Return
-- `M::Complex{Float64}`: Signal generated from an STFR scan
+`workspace isa STFRBlochSimWorkspace`.
 """
-function stfrblochsim(
-    M0::Real,
-    frac::AbstractArray{<:Real,1},
-    T1::AbstractArray{<:Real,1},
-    T2::AbstractArray{<:Real,1},
-    Δω::AbstractArray{<:Real,1},
-    τ::AbstractArray{<:Real,1},
-    κ::Real,
-    Tfree::Real,
-    Tg::Real,
-    α::Real,
-    β::Real,
-    ϕ::Real,
-    TE::Real = Tfree / 2;
-    how::Symbol = :ideal,
-    kwargs...
-)
+struct STFRBlochSim{T<:Real,T1<:AbstractRF,T2<:AbstractRF,T3<:AbstractSpoiling,nTR,save_transients}
+    Tfree::T
+    Tg::T
+    TE::T
+    rftipdown::T1
+    rftipup::T2
+    spoiling::T3
 
-    spin = SpinMC(M0, frac, T1, T2, Δω / 2π, τ)
-    if how == :ideal
-        return stfrblochsim(spin, Tfree, Tg, κ * α, κ * β, ϕ, TE; kwargs...)
-    elseif how == :grad || how == :rfspoil
-        return stfrblochsim_avg(spin, Tfree, Tg, κ * α, κ * β, ϕ, TE, how;
-                                kwargs...)
+    function STFRBlochSim(
+        Tfree::Real,
+        Tg::Real,
+        TE::Real,
+        rftipdown::T1,
+        rftipup::T2,
+        spoiling::T3,
+        nTR::Val{T4},
+        save_transients::Val{T5}
+    ) where {T1<:AbstractRF,T2<:AbstractRF,T3<:AbstractSpoiling,T4,T5}
+
+        Tfree >= TE + duration(rftipup) / 2 ||
+            error("Tfree must be greater than or equal to TE + duration(rftipup) / 2")
+        TE >= duration(rftipdown) / 2 || error("TE must not be during the tip-down pulse")
+        Tg >= duration(rftipup) / 2 + spoiler_gradient_duration(spoiling) + duration(rftipdown) / 2 ||
+            error("Tg must be greater than or equal to duration(rftipup) / 2 + " *
+                  "duration(rftipdown) / 2 + spoiler_gradient_duration")
+        (T4 isa Int && T4 >= 0) || error("nTR must be a nonnegative Int")
+        T3 <: Union{<:RFSpoiling,<:RFandGradientSpoiling} && (T4 > 0 ||
+            error("nTR must be positive when simulating RF spoiling"))
+        T5 isa Bool || error("save_transients must be a Bool")
+        T4 == 0 && T5 &&
+            @warn("save_transients is true, but nTR = 0; no transients will be saved")
+        args = promote(Tfree, Tg, TE)
+        T = typeof(args[1])
+        new{T,T1,T2,T3,T4,T5}(args..., rftipdown, rftipup, spoiling)
+
+    end
+end
+
+STFRBlochSim(Tfree, Tg, TE, rftipdown, rftipup, spoiling::AbstractSpoiling, nTR::Val = Val(0)) = STFRBlochSim(Tfree, Tg, TE, rftipdown, rftipup, spoiling, nTR, Val(false))
+STFRBlochSim(Tfree, Tg, TE, rftipdown, rftipup, nTR::Val, save_transients::Val = Val(false)) = STFRBlochSim(Tfree, Tg, TE, rftipdown, rftipup, IdealSpoiling(), nTR, save_transients)
+STFRBlochSim(Tfree, Tg, TE, rftipdown, rftipup) = STFRBlochSim(Tfree, Tg, TE, rftipdown, rftipup, IdealSpoiling(), Val(0), Val(false))
+STFRBlochSim(Tfree, Tg, TE, α::Real, rftipup, spoiling::AbstractSpoiling, nTR, save_transients) = STFRBlochSim(Tfree, Tg, TE, InstantaneousRF(α), rftipup, spoiling, nTR, save_transients)
+STFRBlochSim(Tfree, Tg, TE, rftipdown, β::Real, ϕ::Real, args...) = STFRBlochSim(Tfree, Tg, TE, rftipdown, InstantaneousRF(-β, ϕ), args...)
+
+Base.show(io::IO, stfr::STFRBlochSim{<:AbstractRF,<:AbstractRF,<:AbstractSpoiling,nTR,save}) where {nTR,save} =
+    print(io, "STFRBlochSim(", stfr.Tfree, ", ", stfr.Tg, ", ", stfr.TE, ", ", stfr.rftipdown, ", ", stfr.rftipup, ", ", stfr.spoiling, ", Val(", nTR, "), Val(", save, "))")
+
+function Base.show(io::IO, ::MIME"text/plain", stfr::STFRBlochSim{<:AbstractRF,<:AbstractRF,<:AbstractSpoiling,nTR,save}) where {nTR,save}
+
+    print(io, "Small-Tip Fast Recovery (STFR) Bloch Simulation:")
+    print(io, "\n Tfree = ", stfr.Tfree, " ms")
+    print(io, "\n Tg = ", stfr.Tg, " ms")
+    print(io, "\n TE = ", stfr.TE, " ms")
+    print(io, "\n rftipdown (tip-down excitation pulse) = ")
+    show(io, "text/plain", stfr.rftipdown)
+    print(io, "\n rftipup (tip-up RF pulse) = ")
+    show(io, "text/plain", stfr.rftipup)
+    print(io, "\n spoiling = ")
+    show(io, "text/plain", stfr.spoiling)
+    if nTR == 0
+        print(io, "\n steady-state")
     else
-        howerror(how)
+        print(io, "\n nTR = ", nTR)
+        print(io, "\n save transients = ", save)
     end
 
 end
 
-"""
-    stfrblochsim(spin, Tfree, Tg, α, β, ϕ, TE; rfduration, nrf)
+struct STFRBlochSimWorkspace{T1,T2,T3,T4,T5,T6,T7,T8,T9,T10,T11,T12,T13,T14}
+    Atd::T1
+    Btd::T2
+    Ate::T3
+    Bte::T4
+    Atf::T3
+    Btf::T4
+    Atu::T5
+    Btu::T6
+    Atg::T3
+    Btg::T4
+    As::T7
+    Bs::T8
+    tmpA1::T9
+    tmpB1::T4
+    tmpA2::T9
+    tmpB2::T4
+    mat::T10
+    vec::T11
+    bm_workspace::T12
+    td_workspace::T13
+    tu_workspace::T14
+end
 
-Simulate the steady-state signal acquired from STFR, assuming instantaneous
-excitations and ideal spoiling.
-"""
-function stfrblochsim(
+function STFRBlochSimWorkspace(
     spin::AbstractSpin,
-    Tfree::Real,
-    Tg::Real,
-    α::Real,
-    β::Real,
-    ϕ::Real,
-    TE::Real;
-    rfduration::Real = 0,
-    nrf::Integer = 401
+    scan::STFRBlochSim,
+    bm_workspace = spin isa Spin ? nothing : BlochMcConnellWorkspace(spin)
 )
 
-    if rfduration == 0
-        # Precompute spin dynamics
-        (Atd, Btd) = excitation(spin, 0, α)
-        (Atu, Btu) = excitation(spin, ϕ, -β)
+    STFRBlochSimWorkspace(typeof(spin), typeof(scan), bm_workspace)
+
+end
+
+function STFRBlochSimWorkspace(
+    spin::Union{Type{Spin{T}},Type{SpinMC{T,N}}},
+    scan::Type{<:STFRBlochSim{<:Real,T1,T2,T3}},
+    bm_workspace = spin <: Spin ? nothing : BlochMcConnellWorkspace(spin)
+) where {T,N,T1,T2,T3}
+
+    if T1 <: InstantaneousRF
+        Atd = ExcitationMatrix{T}()
+        Btd = nothing
+        td_workspace = nothing
     else
-        # Compute the time step
-        dt = rfduration / nrf
-        # Generate waveforms for the RF pulses
-        rftd = getrf(α, dt, nrf)
-        rftu = getrf(-β, dt, nrf)
-        # Precompute spin dynamics
-        (Atd, Btd) = excitation(spin, rftd, 0, [0, 0, 0], dt)
-        (Atu, Btu) = excitation(spin, rftu, ϕ, [0, 0, 0], dt)
+        if spin <: Spin
+            Atd = BlochMatrix{T}()
+            Btd = Magnetization{T}()
+        else
+            Atd = BlochMcConnellMatrix{T}(N)
+            Btd = MagnetizationMC{T}(N)
+        end
+        td_workspace = ExcitationWorkspace(spin, bm_workspace)
     end
-    (Atf, Btf) = freeprecess(spin, Tfree - rfduration)
-    (Atg, Btg) = freeprecess(spin, Tg - rfduration)
-    S = spoil(spin)
-
-    # Compute steady state magnetization
-    M = (Diagonal(ones(Bool, size(S, 1))) - Atd * S * Atg * Atu * Atf) \
-        (Atd * (S * (Atg * (Atu * Btf))) + Atd * (S * (Atg * Btu)) +
-         Atd * (S * Btg) + Btd)
-
-    # Compute signal at echo time
-    (Ate, Bte) = freeprecess(spin, TE - rfduration / 2)
-    M = Ate * M + Bte
-    return complex(sum(M[1:3:end]), sum(M[2:3:end]))
+    if T2 <: InstantaneousRF
+        Atu = ExcitationMatrix{T}()
+        Btu = nothing
+        tu_workspace = nothing
+    else
+        if spin <: Spin
+            Atu = BlochMatrix{T}()
+            Btu = Magnetization{T}()
+        else
+            Atu = BlochMcConnellMatrix{T}(N)
+            Btu = MagnetizationMC{T}(N)
+        end
+        tu_workspace = ExcitationWorkspace(spin, bm_workspace)
+    end
+    if T3 <: IdealSpoiling
+        As = idealspoiling
+        Bs = nothing
+    elseif T3 <: RFSpoiling
+        As = nothing
+        Bs = nothing
+    elseif spin <: Spin
+        As = FreePrecessionMatrix{T}()
+        Bs = Magnetization{T}()
+    else
+        As = BlochMcConnellMatrix{T}(N)
+        Bs = MagnetizationMC{T}(N)
+    end
+    if spin <: Spin
+        Ate = FreePrecessionMatrix{T}()
+        Bte = Magnetization{T}()
+        Atf = FreePrecessionMatrix{T}()
+        Btf = Magnetization{T}()
+        Atg = FreePrecessionMatrix{T}()
+        Btg = Magnetization{T}()
+        tmpA1 = BlochMatrix{T}()
+        tmpB1 = Magnetization{T}()
+        tmpA2 = BlochMatrix{T}()
+        tmpB2 = Magnetization{T}()
+        mat = Matrix{T}(undef, 3, 3)
+        vec = Vector{T}(undef, 3)
+    else
+        Ate = BlochMcConnellMatrix{T}(N)
+        Bte = MagnetizationMC{T}(N)
+        Atf = BlochMcConnellMatrix{T}(N)
+        Btf = MagnetizationMC{T}(N)
+        Atg = BlochMcConnellMatrix{T}(N)
+        Btg = MagnetizationMC{T}(N)
+        tmpA1 = BlochMcConnellMatrix{T}(N)
+        tmpB1 = MagnetizationMC{T}(N)
+        tmpA2 = BlochMcConnellMatrix{T}(N)
+        tmpB2 = MagnetizationMC{T}(N)
+        mat = Matrix{T}(undef, 3N, 3N)
+        vec = Vector{T}(undef, 3N)
+    end
+    STFRBlochSimWorkspace(Atd, Btd, Ate, Bte, Atf, Btf, Atu, Btu, Atg, Btg, As,
+                          Bs, tmpA1, tmpB1, tmpA2, tmpB2, mat, vec,
+                          bm_workspace, td_workspace, tu_workspace)
 
 end
 
-function stfrblochsim_avg(
+# Case when nTR = 0
+function (scan::STFRBlochSim{<:Real,<:AbstractRF,<:AbstractRF,<:AbstractSpoiling,0})(
     spin::AbstractSpin,
-    Tfree::Real,
-    Tg::Real,
-    α::Real,
-    β::Real,
-    ϕ::Real,
-    TE::Real,
-    how::Symbol;
-    nspins::Integer = 40,
-    ncycles::Real = 1,
-    Δθinc::Real = deg2rad(117),
-    nTR::Integer = 300,
-    rfduration::Real = 0,
-    nrf::Integer = 401
+    workspace::STFRBlochSimWorkspace = STFRBlochSimWorkspace(spin, scan)
 )
 
-    # Pick an arbitrary gradient strength and compute the spatial locations that
-    # will provide a uniform ncycles of phase
-    gradz = 0.3 # G/cm
-    zmax = ncycles * 2π / (GAMMA * gradz * (Tg-rfduration)/1000) # cm
-    z = (1:nspins)/nspins * zmax
+    rfduration = (duration(scan.rftipdown) + duration(scan.rftipup)) / 2
 
-    # Make nspins copies of the provided spin at different spatial locations
-    spins = varyz(spin, z)
+    excite!(workspace.Atd, workspace.Btd, spin, scan.rftipdown, workspace.td_workspace)
+    freeprecess!(workspace.Atf, workspace.Btf, spin, scan.Tfree - rfduration, workspace.bm_workspace)
+    excite!(workspace.Atu, workspace.Btu, spin, scan.rftipup, workspace.tu_workspace)
+    freeprecess!(workspace.Atg, workspace.Btg, spin, scan.Tg - rfduration - spoiler_gradient_duration(scan.spoiling), workspace.bm_workspace)
+    spoil!(workspace.As, workspace.Bs, spin, scan.spoiling, workspace.bm_workspace)
 
-    # Compute the STFR signal for each spin
-    if how == :grad && rfduration == 0
-        signals = map(spin -> stfrblochsim(spin, Tfree, Tg, α, β, ϕ, TE,
-                                           [0,0,gradz]), spins)
-    elseif how == :grad
-        signals = map(spin -> stfrblochsim(spin, Tfree, Tg, α, β, ϕ, TE,
-                                           rfduration, nrf, [0,0,gradz]), spins)
-    elseif how == :rfspoil && rfduration == 0
-        signals = map(spin -> stfrblochsim(spin, Tfree, Tg, α, β, ϕ, TE,
-                                           [0,0,gradz], Δθinc, nTR), spins)
-    elseif how == :rfspoil
-        signals = map(spin -> stfrblochsim(spin, Tfree, Tg, α, β, ϕ, TE,
-                                           rfduration, nrf, [0,0,gradz], Δθinc,
-                                           nTR), spins)
+    combine!(workspace.tmpA1, workspace.tmpB1, workspace.Atf, workspace.Btf, workspace.Atu, workspace.Btu)
+    combine!(workspace.tmpA2, workspace.tmpB2, workspace.tmpA1, workspace.tmpB1, workspace.Atg, workspace.Btg)
+    combine!(workspace.tmpA1, workspace.tmpB1, workspace.tmpA2, workspace.tmpB2, workspace.As, workspace.Bs)
+    combine!(workspace.tmpA2, workspace.tmpB2, workspace.tmpA1, workspace.tmpB1, workspace.Atd, workspace.Btd)
+    subtract!(workspace.mat, I, workspace.tmpA2)
+    copyto!(workspace.vec, workspace.tmpB2)
+    F = lu!(workspace.mat)
+    ldiv!(F, workspace.vec)
+    copyto!(spin.M, workspace.vec)
+
+    freeprecess!(workspace.Ate, workspace.Bte, spin, scan.TE - duration(scan.rftipdown) / 2, workspace.bm_workspace)
+    applydynamics!(spin, workspace.tmpB1, workspace.Ate, workspace.Bte)
+
+end
+
+# Case when nTR > 0
+function (scan::STFRBlochSim{<:Real,<:AbstractRF,<:AbstractRF,T,nTR,save})(
+    spin::AbstractSpin,
+    workspace::STFRBlochSimWorkspace = STFRBlochSimWorkspace(spin, scan)
+) where {T,nTR,save}
+
+    rftd = scan.rftipdown
+    rftu = scan.rftipup
+    rfspoiling = T <: Union{<:RFSpoiling,<:RFandGradientSpoiling}
+    rfduration = (duration(rftd) + duration(rftu)) / 2
+
+    if rfspoiling
+        rftd isa RF && (rftd.Δθ[] = rftd.Δθ_initial)
+        rftu isa RF && (rftu.Δθ[] = rftu.Δθ_initial)
+        Δθinc = rfspoiling_increment(scan.spoiling)
+        θ = zero(Δθinc) # For knowing how much phase to remove when recording signal
+        Δθ = Δθinc
+    else
+        excite!(workspace.Atd, workspace.Btd, spin, rftd, workspace.td_workspace)
+        excite!(workspace.Atu, workspace.Btu, spin, rftu, workspace.tu_workspace)
     end
 
-    # Find the average signal
-    signal = sum(signals) / nspins
+    if save
+        M = Vector{typeof(spin.M)}(undef, nTR)
+        freeprecess!(workspace.Atf, workspace.Btf, spin, scan.Tfree - scan.TE - duration(rftu) / 2, workspace.bm_workspace)
+    else
+        freeprecess!(workspace.Atf, workspace.Btf, spin, scan.Tfree - rfduration, workspace.bm_workspace)
+    end
+    freeprecess!(workspace.Atg, workspace.Btg, spin, scan.Tg - rfduration - spoiler_gradient_duration(scan.spoiling), workspace.bm_workspace)
+    spoil!(workspace.As, workspace.Bs, spin, scan.spoiling, workspace.bm_workspace)
+    combine!(workspace.tmpA1, workspace.tmpB1, workspace.Atg, workspace.Btg, workspace.As, workspace.Bs)
+    freeprecess!(workspace.Ate, workspace.Bte, spin, scan.TE - duration(rftd) / 2, workspace.bm_workspace)
 
-    return signal
+    for rep = 1:nTR-1
 
-end
+        rfspoiling && excite!(workspace.Atd, workspace.Btd, spin, rftd, workspace.td_workspace)
+        applydynamics!(spin, workspace.tmpB2, workspace.Atd, workspace.Btd)
+        if save
+            applydynamics!(spin, workspace.tmpB2, workspace.Ate, workspace.Bte)
+            M[rep] = copy(spin.M)
+            if rfspoiling
+                modulation = exp(im * θ)
+                if spin isa Spin
+                    tmp = signal(spin.M) * modulation
+                    M[rep].x = real(tmp)
+                    M[rep].y = imag(tmp)
+                else
+                    for i = 1:spin.N
+                        tmp = signal(spin.M[i]) * modulation
+                        M[rep][i].x = real(tmp)
+                        M[rep][i].y = imag(tmp)
+                    end
+                end
+            end
+        end
+        applydynamics!(spin, workspace.tmpB2, workspace.Atf, workspace.Btf)
+        rfspoiling && excite!(workspace.Atu, workspace.Btu, spin, rftu, workspace.tu_workspace)
+        applydynamics!(spin, workspace.tmpB2, workspace.Atu, workspace.Btu)
+        applydynamics!(spin, workspace.tmpB2, workspace.tmpA1, workspace.tmpB1)
 
-function varyz(spin::Spin, z)
-
-    map(z -> Spin(spin.M0, spin.T1, spin.T2, spin.Δf, [0,0,z]), z)
-
-end
-
-function varyz(spin::SpinMC, z)
-
-    map(z -> SpinMC(spin.M0, spin.frac, spin.T1, spin.T2, spin.Δf, spin.τ,
-                    [0,0,z]), z)
-
-end
-
-"""
-    stfrblochsim(spin, Tfree, Tg, α, β, ϕ, TE, [rfduration, nrf], grad, [Δθinc,
-                 nTR])
-
-Simulate the steady-state signal acquired from STFR, assuming nonideal spoiling
-and possibly instantaneous excitations (if `rfduration` is not provided).
-
-The steady-state is a pseudo steady-state if using RF spoiling.
-"""
-function stfrblochsim(
-    spin::AbstractSpin,
-    Tfree::Real,
-    Tg::Real,
-    α::Real,
-    β::Real,
-    ϕ::Real,
-    TE::Real,
-    grad::AbstractArray{<:Real}
-)
-
-    # Precompute spin dynamics
-    Dtd = excitation(spin, 0, α)
-    Dte = freeprecess(spin, TE)
-    Dtr = freeprecess(spin, Tfree - TE)
-    Dtu = excitation(spin, ϕ, -β)
-    Dtg = freeprecess(spin, Tg, grad)
-
-    # Calculate steady-state magnetization immediately following excitation
-    (A, B) = BlochSim.combine(Dte, Dtr, Dtu, Dtg, Dtd)
-    M = (Diagonal(ones(Bool, size(A, 1))) - A) \ B
-
-    # Calculate steady-state signal at echo time
-    M = Dte[1] * M + Dte[2]
-
-    return complex(sum(M[1:3:end]), sum(M[2:3:end]))
-
-end
-
-function stfrblochsim(
-    spin::AbstractSpin,
-    Tfree::Real,
-    Tg::Real,
-    α::Real,
-    β::Real,
-    ϕ::Real,
-    TE::Real,
-    rfduration::Real,
-    nrf::Integer,
-    grad::AbstractArray{<:Real}
-)
-
-    # Compute the time step
-    dt = rfduration / nrf
-
-    # Generate waveforms for the RF pulses
-    rftd = getrf(α, dt, nrf)
-    rftu = getrf(-β, dt, nrf)
-
-    # Precompute spin dynamics
-    Dtd = excitation(spin, rftd, 0, [0, 0, 0], dt)
-    Dte = freeprecess(spin, TE - rfduration / 2)
-    Dtr = freeprecess(spin, Tfree - TE - rfduration / 2)
-    Dtu = excitation(spin, rftu, ϕ, [0, 0, 0], dt)
-    Dtg = freeprecess(spin, Tg - rfduration, grad)
-
-    # Calculate steady-state magnetization immediately following excitation
-    (A, B) = BlochSim.combine(Dte, Dtr, Dtu, Dtg, Dtd)
-    M = (Diagonal(ones(Bool, size(A, 1))) - A) \ B
-
-    # Calculate steady-state signal at echo time
-    M = Dte[1] * M + Dte[2]
-
-    return complex(sum(M[1:3:end]), sum(M[2:3:end]))
-
-end
-
-function stfrblochsim(
-    spin::AbstractSpin,
-    Tfree::Real,
-    Tg::Real,
-    α::Real,
-    β::Real,
-    ϕ::Real,
-    TE::Real,
-    grad::AbstractArray{<:Real},
-    Δθinc::Real,
-    nTR::Integer
-)
-
-    # Precompute spin dynamics
-    Dte = freeprecess(spin, TE)
-    Dtr = freeprecess(spin, Tfree - TE)
-    Dtetr = BlochSim.combine(Dte, Dtr)
-    Dtg = freeprecess(spin, Tg, grad)
-
-    # Initialize RF spoiling parameters
-    θ = 0
-    Δθ = Δθinc
-
-    # Simulate nTR TR's
-    M = spin.M
-    for rep = 1:nTR
-
-        (A, B) = excitation(spin, θ, α)
-        M = A * M + B
-        M = Dtetr[1] * M + Dtetr[2]
-        (A, B) = excitation(spin, θ + ϕ, -β)
-        M = A * M + B
-        M = Dtg[1] * M + Dtg[2]
-        θ += Δθ
-        Δθ += Δθinc
+        if rfspoiling
+            if rftd isa InstantaneousRF
+                rftd = InstantaneousRF(rftd.α, rftd.θ + Δθ)
+            else
+                rftd.Δθ[] += Δθ
+            end
+            if rftu isa InstantaneousRF
+                rftu = InstantaneousRF(rftu.α, rftu.θ + Δθ)
+            else
+                rftu.Δθ[] += Δθ
+            end
+            θ += Δθ
+            Δθ += Δθinc
+        end
 
     end
 
-    # Calculate signal at echo time
-    (A, B) = excitation(spin, θ, α)
-    M = A * M + B
-    M = Dte[1] * M + Dte[2]
-
-    return complex(sum(M[1:3:end]), sum(M[2:3:end])) * exp(im * θ)
-
-end
-
-function stfrblochsim(
-    spin::AbstractSpin,
-    Tfree::Real,
-    Tg::Real,
-    α::Real,
-    β::Real,
-    ϕ::Real,
-    TE::Real,
-    rfduration::Real,
-    nrf::Integer,
-    grad::AbstractArray{<:Real},
-    Δθinc::Real,
-    nTR::Integer
-)
-
-    # Compute the time step
-    dt = rfduration / nrf
-
-    # Generate waveforms for the RF pulses
-    rftd = getrf(α, dt, nrf)
-    rftu = getrf(-β, dt, nrf)
-
-    # Precompute spin dynamics
-    Dte = freeprecess(spin, TE - rfduration / 2)
-    Dtr = freeprecess(spin, Tfree - TE - rfduration / 2)
-    Dtetr = BlochSim.combine(Dte, Dtr)
-    Dtg = freeprecess(spin, Tg - rfduration, grad)
-
-    # Initialize RF spoiling parameters
-    θ = 0
-    Δθ = Δθinc
-
-    # Simulate nTR TR's
-    M = spin.M
-    for rep = 1:nTR
-
-        (A, B) = excitation(spin, rftd, θ, [0, 0, 0], dt)
-        M = A * M + B
-        M = Dtetr[1] * M + Dtetr[2]
-        (A, B) = excitation(spin, rftu, θ + ϕ, [0, 0, 0], dt)
-        M = A * M + B
-        M = Dtg[1] * M + Dtg[2]
-        θ += Δθ
-        Δθ += Δθinc
-
+    rfspoiling && excite!(workspace.Atd, workspace.Btd, spin, rftd, workspace.td_workspace)
+    applydynamics!(spin, workspace.tmpB2, workspace.Atd, workspace.Btd)
+    applydynamics!(spin, workspace.tmpB2, workspace.Ate, workspace.Bte)
+    if rfspoiling
+        modulation = exp(im * θ)
+        if spin isa Spin
+            tmp = signal(spin.M) * modulation
+            spin.M.x = real(tmp)
+            spin.M.y = imag(tmp)
+        else
+            for i = 1:spin.N
+                tmp = signal(spin.M[i]) * modulation
+                spin.M[i].x = real(tmp)
+                spin.M[i].y = imag(tmp)
+            end
+        end
     end
-
-    # Calculate signal at echo time
-    (A, B) = excitation(spin, rftd, θ, [0, 0, 0], dt)
-    M = A * M + B
-    M = Dte[1] * M + Dte[2]
-
-    return complex(sum(M[1:3:end]), sum(M[2:3:end])) * exp(im * θ)
-
-end
-
-"""
-    getrf(α, dt, nrf)
-
-Get a sinc RF waveform.
-
-# Arguments
-- `α::Real`: Flip angle (rad)
-- `dt::Real`: Time step (ms)
-- `nrf::Integer`: Number of time points
-
-# Return
-- `rf::Array{<:Real,1}`: RF waveform (G)
-"""
-function getrf(
-    α::Real,
-    dt::Real,
-    nrf::Integer
-)
-
-    rfshape = sinc.(LinRange(-4, 4, nrf)) # Shape of RF pulse
-    normfact = sum(rfshape) * dt/1000 # Normalization factor (s)
-    rfflip = (α / normfact) * rfshape # Normalize RF shape to flip angle (rad/s)
-    rf = rfflip / GAMMA # Convert to Gauss (G)
-
-    return rf
-
-end
-
-# Avoid string interpolation in the case where how is okay
-@noinline function howerror(how::Symbol)
-
-    throw(ArgumentError("unsupported how = :$how"))
+    if save
+        M[nTR] = copy(spin.M)
+        return M
+    end
 
 end

@@ -8,7 +8,7 @@ using Reexport
 using LinearAlgebra: Diagonal, I, ldiv!, lu!
 
 include("signalmodel.jl")
-include("STFRBlochSim.jl")
+include("blochsim.jl")
 
 export stfr
 export STFRBlochSim

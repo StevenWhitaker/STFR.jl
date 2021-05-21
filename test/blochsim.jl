@@ -16,6 +16,8 @@ function testone1()
     stfrblochsim! = STFRBlochSim(Tfree, Tg, Tfree / 2, κ*α, κ*β, ϕ)
     stfrblochsim!(spin)
 
+    show(devnull, stfrblochsim!)
+    show(devnull, "text/plain", stfrblochsim!)
     return s1 ≈ signal(spin)
 
 end
@@ -227,6 +229,7 @@ function testnonideal3()
     end
     div!(M2, nz)
 
+    show(devnull, "text/plain", stfrblochsim!)
     return isapprox(M1, M2; atol = 1e-4)
 
 end
