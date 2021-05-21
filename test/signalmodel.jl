@@ -12,8 +12,9 @@ function stfr1_size1()
     α = 10 * π/180
     β = 10 * π/180
     ϕ = 1 * π/180
-    resultsp = stfr(M0, T1, T2, Δω, κ, Tfree, Tg, α, β, ϕ, spoil = true)
-    resultun = stfr(M0, T1, T2, Δω, κ, Tfree, Tg, α, β, ϕ, spoil = false)
+    TE = Tfree / 2
+    resultsp = stfr(M0, T1, T2, Δω, κ, Tfree, Tg, α, β, ϕ, TE, Val(true))
+    resultun = stfr(M0, T1, T2, Δω, κ, Tfree, Tg, α, β, ϕ, TE, Val(false))
     return size(resultsp) == () && size(resultun) == ()
 
 end
@@ -32,10 +33,11 @@ function stfr1_size2()
     α = [10,10] * π/180
     β = [10,10] * π/180
     ϕ = [1,1] * π/180
+    TE = Tfree / 2
     resultsp = stfr.(M0', T1', T2', Δω', κ', Tfree, Tg, α, β, ϕ,
-                     spoil = true)
+                     TE, Val(true))
     resultun = stfr.(M0', T1', T2', Δω', κ', Tfree, Tg, α, β, ϕ,
-                     spoil = false)
+                     TE, Val(false))
     return size(resultsp) == (2,3) && size(resultun) == (2,3)
 
 end
@@ -54,10 +56,11 @@ function stfr1_size3()
     α = 10 * π/180
     β = 10 * π/180
     ϕ = 1 * π/180
+    TE = Tfree / 2
     resultsp = stfr.(M0', T1', T2', Δω', κ', Tfree, Tg, α, β, ϕ,
-                     spoil = true)
+                     TE, Val(true))
     resultun = stfr.(M0', T1', T2', Δω', κ', Tfree, Tg, α, β, ϕ,
-                     spoil = false)
+                     TE, Val(false))
     return size(resultsp) == (1,3) && size(resultun) == (1,3)
 
 end
@@ -76,8 +79,9 @@ function stfr1_size4()
     α = [10,10] * π/180
     β = [10,10] * π/180
     ϕ = [1,1] * π/180
-    resultsp = stfr.(M0, T1, T2, Δω, κ, Tfree, Tg, α, β, ϕ, spoil = true)
-    resultun = stfr.(M0, T1, T2, Δω, κ, Tfree, Tg, α, β, ϕ, spoil = false)
+    TE = Tfree / 2
+    resultsp = stfr.(M0, T1, T2, Δω, κ, Tfree, Tg, α, β, ϕ, TE, Val(true))
+    resultun = stfr.(M0, T1, T2, Δω, κ, Tfree, Tg, α, β, ϕ, TE, Val(false))
     return size(resultsp) == (2,) && size(resultun) == (2,)
 
 end
@@ -100,10 +104,11 @@ function stfr2_size1()
     α = 10 * π/180
     β = 10 * π/180
     ϕ = 1 * π/180
+    TE = Tfree / 2
     resultsp = stfr(M0, ff, T1f, T1s, T2f, T2s, Δωf, Δωs, κ, Tfree, Tg, α, β, ϕ,
-                    spoil = true)
+                    TE, Val(true))
     resultun = stfr(M0, ff, T1f, T1s, T2f, T2s, Δωf, Δωs, κ, Tfree, Tg, α, β, ϕ,
-                    spoil = false)
+                    TE, Val(false))
     return size(resultsp) == () && size(resultun) == ()
 
 end
@@ -126,10 +131,11 @@ function stfr2_size2()
     α = [10,10] * π/180
     β = [10,10] * π/180
     ϕ = [1,1] * π/180
+    TE = Tfree / 2
     resultsp = stfr.(M0', ff', T1f', T1s', T2f', T2s', Δωf', Δωs', κ',
-                     Tfree, Tg, α, β, ϕ, spoil = true)
+                     Tfree, Tg, α, β, ϕ, TE, Val(true))
     resultun = stfr.(M0', ff', T1f', T1s', T2f', T2s', Δωf', Δωs', κ',
-                     Tfree, Tg, α, β, ϕ, spoil = false)
+                     Tfree, Tg, α, β, ϕ, TE, Val(false))
     return size(resultsp) == (2,3) && size(resultun) == (2,3)
 
 end
@@ -152,10 +158,11 @@ function stfr2_size3()
     α = 10 * π/180
     β = 10 * π/180
     ϕ = 1 * π/180
+    TE = Tfree / 2
     resultsp = stfr.(M0', ff', T1f', T1s', T2f', T2s', Δωf', Δωs', κ',
-                     Tfree, Tg, α, β, ϕ, spoil = true)
+                     Tfree, Tg, α, β, ϕ, TE, Val(true))
     resultun = stfr.(M0', ff', T1f', T1s', T2f', T2s', Δωf', Δωs', κ',
-                     Tfree, Tg, α, β, ϕ, spoil = false)
+                     Tfree, Tg, α, β, ϕ, TE, Val(false))
     return size(resultsp) == (1,3) && size(resultun) == (1,3)
 
 end
@@ -178,10 +185,11 @@ function stfr2_size4()
     α = [10,10] * π/180
     β = [10,10] * π/180
     ϕ = [1,1] * π/180
+    TE = Tfree / 2
     resultsp = stfr.(M0, ff, T1f, T1s, T2f, T2s, Δωf, Δωs, κ, Tfree, Tg, α, β, ϕ,
-                     spoil = true)
+                     TE, Val(true))
     resultun = stfr.(M0, ff, T1f, T1s, T2f, T2s, Δωf, Δωs, κ, Tfree, Tg, α, β, ϕ,
-                     spoil = false)
+                     TE, Val(false))
     return size(resultsp) == (2,) && size(resultun) == (2,)
 
 end
@@ -211,7 +219,7 @@ function stfr1_mat(matfile::String)
     end
     result = stfr.(v["M0"]', v["T1"]', v["T2"]', v["wf"]', v["kappa"]',
                    v["Tfree"], v["Tg"], v["alpha"], v["beta"], v["phi"],
-                   spoil = v["spoil"])
+                   v["Tfree"] / 2, Val(v["spoil"]))
     # Check if the result is a scalar or not
     if length(result) > 1
         # The MATLAB result will never be a row vector, so if Julia produces a row
@@ -257,7 +265,8 @@ function stfr2_mat(matfile::String)
     end
     result = stfr.(v["M0"]', v["ff"]', v["T1f"]', v["T1s"]', v["T2f"]',
                    v["T2s"]', v["wff"]', v["wf"]', v["kappa"]', v["Tfree"],
-                   v["Tg"], v["alpha"], v["beta"], v["phi"], spoil = v["spoil"])
+                   v["Tg"], v["alpha"], v["beta"], v["phi"], v["Tfree"] / 2,
+                   Val(v["spoil"]))
     # Check if the result is a scalar or not
     if length(result) > 1
         # The MATLAB result will never be a row vector, so if Julia produces a row

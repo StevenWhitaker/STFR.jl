@@ -1,8 +1,9 @@
 """
-    stfr(M0, T1, T2, Δω, κ, Tfree, Tg, α, β, ϕ[, TE]; spoil)
+    stfr(M0, T1, T2, Δω, κ, Tfree, Tg, α, β, ϕ, TE, [spoil])
 
-Compute the signal generated from an STFR scan of the given tissue parameters
-with the given scan parameters.
+Compute the steady-state signal generated from an STFR scan of the given tissue
+parameters with the given scan parameters, assuming instantaneous RF pulses and
+ideal spoiling.
 
 # Arguments
 - `M0::Real`: Equilibrium magnetization
@@ -15,11 +16,11 @@ with the given scan parameters.
 - `α::Real`: Tip-down angle (rad)
 - `β::Real`: Tip-up angle (rad)
 - `ϕ::Real`: Phase of tip-up RF pulse (rad)
-- `TE::Real = Tfree / 2`: Echo time (ms)
-- `spoil::Bool = true`: Whether to include RF spoiling
+- `TE::Real`: Echo time (ms)
+- `spoil::Val = Val(true)`: Whether to include RF spoiling
 
 # Return
-- `M::Complex`: Signal generated from an STFR scan
+- `signal::Complex`: Signal generated from the STFR scan
 """
 function stfr(
     M0::Real,
@@ -32,9 +33,9 @@ function stfr(
     α::Real,
     β::Real,
     ϕ::Real,
-    TE::Real = Tfree / 2;
-    spoil::Bool = true
-)
+    TE::Real,
+    ::Val{spoil} = Val(true)
+) where {spoil}
 
     if spoil
         return   stfr_spoil(M0, T1, T2, Δω, κ, Tfree, Tg, α, β, ϕ, TE)
@@ -45,10 +46,12 @@ function stfr(
 end
 
 """
-    stfr(M0, ff, T1f, T1s, T2f, T2s, Δωf, Δω, κ, Tfree, Tg, α, β, ϕ[, TE]; spoil)
+    stfr(M0, ff, T1f, T1s, T2f, T2s, Δωf, Δω, κ, Tfree, Tg, α, β, ϕ, TE, [spoil])
 
-Compute the signal generated from an STFR scan of the given two-compartment
-tissue parameters with the given scan parameters.
+Compute the steady-state signal generated from an STFR scan of the given
+two-compartment tissue parameters with the given scan parameters, assuming
+instantaneous RF pulses, ideal spoiling, and no exchange between the two
+compartments.
 
 # Arguments
 - `M0::Real`: Equilibrium magnetization
@@ -65,11 +68,11 @@ tissue parameters with the given scan parameters.
 - `α::Real`: Tip-down angle (rad)
 - `β::Real`: Tip-up angle (rad)
 - `ϕ::Real`: Phase of tip-up RF pulse (rad)
-- `TE::Real = Tfree / 2`: Echo time (ms)
-- `spoil::Bool = true`: Whether to include RF spoiling
+- `TE::Real`: Echo time (ms)
+- `spoil::Val = Val(true)`: Whether to include RF spoiling
 
 # Return
-- `M::Complex`: Signal generated from a two-compartment STFR scan
+- `signal::Complex`: Signal generated from the two-compartment STFR scan
 """
 function stfr(
     M0::Real,
@@ -86,9 +89,9 @@ function stfr(
     α::Real,
     β::Real,
     ϕ::Real,
-    TE::Real = Tfree / 2;
-    spoil::Bool = true
-)
+    TE::Real,
+    ::Val{spoil} = Val(true)
+) where {spoil}
 
     if spoil
         return   ff  * stfr_spoil(M0, T1f, T2f, Δω + Δωf,

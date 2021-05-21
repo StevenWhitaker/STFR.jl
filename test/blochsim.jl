@@ -10,7 +10,8 @@ function testone1()
     α = deg2rad(15)
     β = deg2rad(13)
     ϕ = deg2rad(30)
-    s1 = stfr(M0, T1, T2, Δω, κ, Tfree, Tg, α, β, ϕ)
+    TE = Tfree / 2
+    s1 = stfr(M0, T1, T2, Δω, κ, Tfree, Tg, α, β, ϕ, TE)
 
     spin = Spin(M0, T1, T2, Δω / 2π)
     stfrblochsim! = STFRBlochSim(Tfree, Tg, Tfree / 2, κ*α, κ*β, ϕ)
@@ -34,7 +35,8 @@ function testone2()
     α = deg2rad.([15, 14])
     β = deg2rad.([13, 3])
     ϕ = deg2rad.([30, 0])
-    s1 = stfr.(M0', T1', T2', Δω', κ', Tfree, Tg, α, β, ϕ)
+    TE = Tfree / 2
+    s1 = stfr.(M0', T1', T2', Δω', κ', Tfree, Tg, α, β, ϕ, TE)
 
     s2 = Matrix{ComplexF64}(undef, length(Tfree), length(M0))
     workspace = STFRBlochSimWorkspace(Spin{Float64}, STFRBlochSim{<:Real,InstantaneousRF,InstantaneousRF,IdealSpoiling})
@@ -65,7 +67,8 @@ function testtwo1()
     α = deg2rad(11)
     β = deg2rad(1)
     ϕ = deg2rad(0)
-    s1 = stfr(M0, ff, T1f, T1s, T2f, T2s, Δωf, Δω, κ, Tfree, Tg, α, β, ϕ)
+    TE = Tfree / 2
+    s1 = stfr(M0, ff, T1f, T1s, T2f, T2s, Δωf, Δω, κ, Tfree, Tg, α, β, ϕ, TE)
 
     frac = (ff, 1-ff)
     T1 = (T1f, T1s)
@@ -101,7 +104,8 @@ function testtwo2()
     T2 = permutedims([[T2f[i], T2s[i]] for i = 1:length(T2f)])
     Δω2 = permutedims([[Δωf[i], 0] .+ Δω[i] for i = 1:length(Δω)])
     τ = [[Inf, Inf]]
-    s1 = stfr.(M0', ff', T1f', T1s', T2f', T2s', Δωf', Δω', κ', Tfree, Tg, α, β, ϕ)
+    TE = Tfree / 2
+    s1 = stfr.(M0', ff', T1f', T1s', T2f', T2s', Δωf', Δω', κ', Tfree, Tg, α, β, ϕ, TE)
 
     s2 = Matrix{ComplexF64}(undef, length(Tfree), length(M0))
     workspace = STFRBlochSimWorkspace(SpinMC{Float64,2}, STFRBlochSim{<:Real,InstantaneousRF,InstantaneousRF,IdealSpoiling})
@@ -256,7 +260,8 @@ function testnoninstant1()
     Δf = [(Δωf[i] + Δω[i], Δω[i]) ./ 2π for i = 1:length(Δωf)]
     τ = (Inf, Inf)
     Δt = 0.0002
-    s1 = stfr.(M0', ff', T1f', T1s', T2f', T2s', Δωf', Δω', κ', Tfree, Tg, α, β, ϕ)
+    TE = Tfree / 2
+    s1 = stfr.(M0', ff', T1f', T1s', T2f', T2s', Δωf', Δω', κ', Tfree, Tg, α, β, ϕ, TE)
 
     s2 = Matrix{ComplexF64}(undef, length(Tfree), length(M0))
     workspace = STFRBlochSimWorkspace(SpinMC{Float64,2}, STFRBlochSim{<:Real,RF,RF,IdealSpoiling})

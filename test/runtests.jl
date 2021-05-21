@@ -1,4 +1,3 @@
-using BlochSim
 using LinearAlgebra
 using MAT
 using STFR
