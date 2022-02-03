@@ -1,13 +1,14 @@
 """
-    stfr! = STFRBlochSim(Tfree, Tg, TE, rftipdown, rftipup, [spoiling], [nTR], [save_transients])
-    stfr! = STFRBlochSim(Tfree, Tg, TE, rftipdown, β, ϕ, [spoiling], [nTR], [save_transients])
-    stfr!(spin, [workspace])
+    stfr = STFRBlochSim(Tfree, Tg, TE, rftipdown, rftipup, [spoiling], [nTR], [save_transients])
+    stfr = STFRBlochSim(Tfree, Tg, TE, rftipdown, β, ϕ, [spoiling], [nTR], [save_transients])
+    stfr([inplace], spin, [workspace])
 
 Simulate a small-tip fast recovery (STFR) scan on `spin`, overwriting the spin's
-magnetization vector. The resultant magnetization is stored in `spin.M`. If
-`nTR > 0` and `save_transients === true`, then `stfr!(...)` returns a `Vector`
-with the magnetization vectors at the echo time for each of the `nTR` simulated
-TRs.
+magnetization vector if `inplace === Val(true)` (default). The resultant
+magnetization in that case is stored in `spin.M`; otherwise, the resultant
+magnetization is returned. If `nTR > 0` and `save_transients === true`, then
+`stfr(...)` returns a `Vector` with the magnetization vectors at the echo time
+for each of the `nTR` simulated TRs.
 
 # Arguments
 - `Tfree::Real`: Time from the center of the tip-down RF pulse to the center of
@@ -32,7 +33,8 @@ TRs.
   magnetization vectors at the TE for each of the `nTR` simulated TRs; does
   nothing if `nTR == 0`
 
-`workspace isa STFRBlochSimWorkspace`.
+`workspace isa STFRBlochSimWorkspace` and is only an (optional) argument if
+`inplace === Val(true)`.
 """
 struct STFRBlochSim{T<:Real,T1<:AbstractRF,T2<:AbstractRF,T3<:AbstractSpoiling,nTR,save_transients}
     Tfree::T
@@ -218,6 +220,143 @@ end
 
 # Case when nTR = 0
 function (scan::STFRBlochSim{<:Real,<:AbstractRF,<:AbstractRF,<:AbstractSpoiling,0})(
+    inplace::Val{false},
+    spin::AbstractSpin
+)
+
+    rfduration = (duration(scan.rftipdown) + duration(scan.rftipup)) / 2
+
+    (Atd, Btd) = excite(spin, scan.rftipdown)
+    (Atf, Btf) = freeprecess(spin, scan.Tfree - rfduration)
+    (Atu, Btu) = excite(spin, scan.rftipup)
+    (Atg, Btg) = freeprecess(spin, scan.Tg - rfduration - spoiler_gradient_duration(scan.spoiling))
+    (As, Bs) = spoil(spin, scan.spoiling)
+
+    (A, B) = combine(Atf, Btf, Atu, Btu, Atg, Btg, As, Bs, Atd, Btd)
+    M = (I - A) \ B
+
+    (Ate, Bte) = freeprecess(spin, scan.TE - duration(scan.rftipdown) / 2)
+    return Ate * M + Bte
+
+end
+
+# Case when nTR > 0
+function (scan::STFRBlochSim{<:Real,<:AbstractRF,<:AbstractRF,T,nTR,save})(
+    inplace::Val{false},
+    spin::AbstractSpin
+) where {T,nTR,save}
+
+    rftd = scan.rftipdown
+    rftu = scan.rftipup
+    rfspoiling = T <: Union{<:RFSpoiling,<:RFandGradientSpoiling}
+    rfduration = (duration(rftd) + duration(rftu)) / 2
+
+    if rfspoiling
+        rftd isa RF && (rftd = RF(rftd.α, rftd.θ, rftd.Δt, rftd.Δθ_initial, rftd.grad))
+        rftu isa RF && (rftu = RF(rftu.α, rftu.θ, rftu.Δt, rftu.Δθ_initial, rftu.grad))
+        Δθinc = rfspoiling_increment(scan.spoiling)
+        θ = zero(Δθinc) # For knowing how much phase to remove when recording signal
+        Δθ = Δθinc
+    else
+        (Atd, Btd) = excite(spin, rftd)
+        (Atu, Btu) = excite(spin, rftu)
+    end
+
+    if save
+        (Atf, Btf) = freeprecess(spin, scan.Tfree - scan.TE - duration(rftu) / 2)
+    else
+        (Atf, Btf) = freeprecess(spin, scan.Tfree - rfduration)
+    end
+    (Atg, Btg) = freeprecess(spin, scan.Tg - rfduration - spoiler_gradient_duration(scan.spoiling))
+    (As, Bs) = spoil(spin, scan.spoiling)
+    (A, B) = combine(Atg, Btg, As, Bs)
+    (Ate, Bte) = freeprecess(spin, scan.TE - duration(rftd) / 2)
+
+    M = spin.M
+    Mout = map(1:nTR-1) do rep
+
+        if rfspoiling
+            (Atd, Btd) = excite(spin, rftd)
+        end
+        M = Atd * M + Btd
+        if save
+            M = Ate * M + Bte
+            if rfspoiling
+                modulation = exp(im * θ)
+                if spin isa Spin
+                    tmp = signal(M) * modulation
+                    M = Magnetization(reim(tmp)..., M.z)
+                else
+                    M = MagnetizationMC(ntuple(spin.N) do i
+                        tmp = signal(M[i]) * modulation
+                        Magnetization(reim(tmp)..., M[i].z)
+                    end...)
+                end
+            end
+        end
+        M = Atf * M + Btf
+        if rfspoiling
+            (Atu, Btu) = excite(spin, rftu)
+        end
+        M = Atu * M + Btu
+        M = A * M + B
+
+        if rfspoiling
+            if rftd isa InstantaneousRF
+                rftd = InstantaneousRF(rftd.α, rftd.θ + Δθ)
+            else
+                rftd = RF(rftd.α, rftd.θ, rftd.Δt, rftd.Δθ[] + Δθ, rftd.grad)
+            end
+            if rftu isa InstantaneousRF
+                rftu = InstantaneousRF(rftu.α, rftu.θ + Δθ)
+            else
+                rftu = RF(rftu.α, rftu.θ, rftu.Δt, rftu.Δθ[] + Δθ, rftu.grad)
+            end
+            θ += Δθ
+            Δθ += Δθinc
+        end
+
+        M
+
+    end
+
+    if rfspoiling
+        (Atd, Btd) = excite(spin, rftd)
+    end
+    M = Atd * M + Btd
+    M = Ate * M + Bte
+    if rfspoiling
+        modulation = exp(im * θ)
+        if spin isa Spin
+            tmp = signal(M) * modulation
+            M = Magnetization(reim(tmp)..., M.z)
+        else
+            M = MagnetizationMC(ntuple(spin.N) do i
+                tmp = signal(M[i]) * modulation
+                Magnetization(reim(tmp)..., M[i].z)
+            end...)
+        end
+    end
+    if save
+        return [Mout; M]
+    else
+        return M
+    end
+
+end
+
+function (scan::STFRBlochSim)(
+    spin::AbstractSpin,
+    workspace::STFRBlochSimWorkspace = STFRBlochSimWorkspace(spin, scan)
+)
+
+    scan(Val(true), spin, workspace)
+
+end
+
+# Case when nTR = 0
+function (scan::STFRBlochSim{<:Real,<:AbstractRF,<:AbstractRF,<:AbstractSpoiling,0})(
+    inplace::Val{true},
     spin::AbstractSpin,
     workspace::STFRBlochSimWorkspace = STFRBlochSimWorkspace(spin, scan)
 )
@@ -247,6 +386,7 @@ end
 
 # Case when nTR > 0
 function (scan::STFRBlochSim{<:Real,<:AbstractRF,<:AbstractRF,T,nTR,save})(
+    inplace::Val{true},
     spin::AbstractSpin,
     workspace::STFRBlochSimWorkspace = STFRBlochSimWorkspace(spin, scan)
 ) where {T,nTR,save}
