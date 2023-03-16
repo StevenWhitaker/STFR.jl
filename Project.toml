@@ -1,7 +1,7 @@
 name = "STFR"
 uuid = "e905d6ce-5d58-11e9-2213-8b5d9f240645"
 authors = ["Steven Whitaker <stwhit@umich.edu>"]
-version = "2.0.1"
+version = "2.0.2"
 
 [deps]
 BlochSim = "5c0f8cbe-99a4-11e9-108b-216da9629524"
